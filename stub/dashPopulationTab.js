@@ -1,0 +1,80 @@
+import Clutter from 'gi://Clutter';
+import St from 'gi://St';
+
+export const MIN_DASH_ITEMS = 3;
+export const MAX_DASH_ITEMS = 100;
+
+export class DashPopulationTab {
+    constructor(initialCount) {
+        this.actor = new St.BoxLayout({
+            vertical: true,
+            style_class: 'stub-tab-content',
+        });
+
+        this.actor.add_child(new St.Label({
+            text: 'Number of dash items',
+            style_class: 'stub-field-label',
+            x_align: Clutter.ActorAlign.START,
+        }));
+
+        const controls = new St.BoxLayout({
+            style_class: 'stub-number-controls',
+            x_align: Clutter.ActorAlign.CENTER,
+        });
+
+        this._decreaseButton = new St.Button({
+            label: '−',
+            style_class: 'stub-number-button',
+            accessible_name: 'Decrease dash population',
+        });
+        this._entry = new St.Entry({
+            style_class: 'stub-number-entry',
+            can_focus: true,
+        });
+        this._increaseButton = new St.Button({
+            label: '+',
+            style_class: 'stub-number-button',
+            accessible_name: 'Increase dash population',
+        });
+
+        controls.add_child(this._decreaseButton);
+        controls.add_child(this._entry);
+        controls.add_child(this._increaseButton);
+        this.actor.add_child(controls);
+
+        this.actor.add_child(new St.Label({
+            text: `Allowed range: ${MIN_DASH_ITEMS}–${MAX_DASH_ITEMS}`,
+            style_class: 'stub-field-help',
+            x_align: Clutter.ActorAlign.CENTER,
+        }));
+
+        this._decreaseId = this._decreaseButton.connect('clicked', () => {
+            this.setCount(this.getCount() - 1);
+        });
+        this._increaseId = this._increaseButton.connect('clicked', () => {
+            this.setCount(this.getCount() + 1);
+        });
+
+        this.setCount(initialCount);
+    }
+
+    getCount() {
+        const parsedCount = Number.parseInt(this._entry.get_text(), 10);
+        const count = Number.isFinite(parsedCount) ? parsedCount : MIN_DASH_ITEMS;
+
+        return Math.min(MAX_DASH_ITEMS, Math.max(MIN_DASH_ITEMS, count));
+    }
+
+    setCount(count) {
+        const clampedCount = Math.min(
+            MAX_DASH_ITEMS,
+            Math.max(MIN_DASH_ITEMS, count)
+        );
+        this._entry.set_text(`${clampedCount}`);
+    }
+
+    destroy() {
+        this._decreaseButton.disconnect(this._decreaseId);
+        this._increaseButton.disconnect(this._increaseId);
+    }
+}

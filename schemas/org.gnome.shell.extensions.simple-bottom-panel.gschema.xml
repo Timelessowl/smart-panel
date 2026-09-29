@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.simple-bottom-panel"
+          path="/org/gnome/shell/extensions/simple-bottom-panel/">
+    <key name="overlay-windows" type="b">
+      <default>false</default>
+      <summary>Allow windows behind the panel</summary>
+      <description>
+        When enabled, the panel does not reserve screen space and maximized
+        windows may extend behind it.
+      </description>
+    </key>
+  </schema>
+</schemalist>

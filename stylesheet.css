@@ -1,0 +1,148 @@
+.bottom-panel-surface {
+    background-color: transparent;
+}
+
+.panel-piece {
+    background-color: rgba(24, 24, 28, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.debian-button {
+    color: #d70a53;
+    padding: 16px;
+}
+
+.debian-button:hover,
+.dash-app-button:hover,
+.system-section-button:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+}
+
+.dash-placeholder {
+    color: white;
+}
+
+.dash-app-button {
+    border-radius: 11px;
+    font-weight: 600;
+}
+
+.dash-overflow-button {
+    background-color: rgba(255, 255, 255, 0.10);
+}
+
+.dash-expanded {
+    color: white;
+}
+
+.search-section {
+    padding: 0 16px;
+    spacing: 10px;
+}
+
+.search-icon {
+    color: rgba(255, 255, 255, 0.65);
+}
+
+.search-entry {
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    color: white;
+    padding: 0;
+}
+
+.search-suggestions {
+    background-color: rgba(24, 24, 28, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    padding: 6px;
+}
+
+.search-suggestion-button {
+    border-radius: 9px;
+    padding: 8px 12px;
+    text-align: left;
+}
+
+.search-suggestion-button:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+}
+
+.indicator-section {
+    color: white;
+}
+
+.indicator-button {
+    border-radius: 8px;
+}
+
+.indicator-button:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+}
+
+.system-section {
+    padding: 6px;
+    spacing: 4px;
+}
+
+.system-section-button {
+    border-radius: 10px;
+    padding: 10px;
+}
+
+.date-button {
+    font-weight: 600;
+}
+
+.stub-dialog-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 14px;
+}
+
+.stub-tab-bar {
+    margin-bottom: 14px;
+}
+
+.stub-tab-button {
+    border-radius: 9px;
+    padding: 8px 12px;
+}
+
+.stub-tab-button.selected {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+.stub-tab-content {
+    spacing: 12px;
+    min-width: 320px;
+}
+
+.stub-field-label {
+    font-weight: 600;
+}
+
+.stub-number-controls {
+    spacing: 10px;
+}
+
+.stub-number-button {
+    border-radius: 9px;
+    padding: 8px 14px;
+    font-size: 18px;
+}
+
+.stub-number-entry {
+    width: 80px;
+    padding: 8px;
+    text-align: center;
+}
+
+.stub-field-help {
+    color: rgba(255, 255, 255, 0.60);
+    font-size: 12px;
+}
