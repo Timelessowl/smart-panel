@@ -7,6 +7,7 @@ import {DashSection} from './dashSection.js';
 import {DebianButton} from './debianButton.js';
 import {IndicatorSection} from './indicatorSection.js';
 import {SearchSection} from './searchSection.js';
+import {SectionFrameManager} from './sectionFrameManager.js';
 import {SystemSection} from './systemSection.js';
 import {WorkAreaStrut} from './workAreaStrut.js';
 
@@ -35,6 +36,7 @@ export class BottomPanel {
         this.actor = new St.Widget({
             style_class: 'bottom-panel-surface',
             layout_manager: new Clutter.FixedLayout(),
+            clip_to_allocation: false,
             reactive: true,
         });
 
@@ -54,6 +56,11 @@ export class BottomPanel {
 
         for (const component of this._components)
             this.actor.add_child(component.actor);
+
+        this._sectionFrameManager = new SectionFrameManager(
+            this.actor,
+            this._components
+        );
 
         this._workAreaStrut = overlayWindows
             ? null
@@ -103,6 +110,7 @@ export class BottomPanel {
         );
         this._placeFromEnd(this._systemSection.actor, 0, SYSTEM_WIDTH);
 
+        this._sectionFrameManager.sync();
         this._searchSection.updatePopupPosition();
     }
 
@@ -130,6 +138,9 @@ export class BottomPanel {
     }
 
     destroy() {
+        this._sectionFrameManager.destroy();
+        this._sectionFrameManager = null;
+
         for (const component of this._components)
             component.destroy?.();
 

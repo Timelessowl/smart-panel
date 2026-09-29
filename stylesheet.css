@@ -3,10 +3,32 @@
 }
 
 .panel-piece {
-    background-color: rgba(24, 24, 28, 0.78);
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    border: 1px solid transparent;
     border-radius: 16px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.panel-section-frame {
+    background-color: transparent;
+    border-style: solid;
+    border-radius: 16px;
+}
+
+.bottom-panel-surface.dark .panel-piece {
+    background-color: rgba(24, 24, 28, 0.78);
+    border-color: rgba(255, 255, 255, 0.14);
+}
+
+.bottom-panel-surface.light .panel-piece {
+    background-color: rgba(244, 244, 247, 0.92);
+    border-color: rgba(0, 0, 0, 0.16);
+}
+
+.bottom-panel-surface.dark .panel-section-frame {
+    border-color: rgb(44, 44, 50);
+}
+
+.bottom-panel-surface.light .panel-section-frame {
+    border-color: rgb(220, 220, 225);
 }
 
 .debian-button {
@@ -14,14 +36,46 @@
     padding: 16px;
 }
 
-.debian-button:hover,
-.dash-app-button:hover,
-.system-section-button:hover {
+.bottom-panel-surface.dark .dash-app-button:hover,
+.bottom-panel-surface.dark .system-section-button:hover,
+.bottom-panel-surface.dark .indicator-button:hover {
     background-color: rgba(255, 255, 255, 0.10);
 }
 
-.dash-placeholder {
-    color: white;
+.bottom-panel-surface.light .dash-app-button:hover,
+.bottom-panel-surface.light .system-section-button:hover,
+.bottom-panel-surface.light .indicator-button:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+.bottom-panel-surface.dark .debian-button:hover,
+.bottom-panel-surface.dark .debian-button:focus,
+.bottom-panel-surface.dark .debian-button:active,
+.bottom-panel-surface.dark .debian-button:checked {
+    background-color: rgb(40, 40, 46);
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow: none;
+}
+
+.bottom-panel-surface.light .debian-button:hover,
+.bottom-panel-surface.light .debian-button:focus,
+.bottom-panel-surface.light .debian-button:active,
+.bottom-panel-surface.light .debian-button:checked {
+    background-color: rgb(228, 228, 232);
+    border-color: rgba(0, 0, 0, 0.16);
+    box-shadow: none;
+}
+
+.bottom-panel-surface.dark .dash-placeholder,
+.bottom-panel-surface.dark .indicator-section,
+.bottom-panel-surface.dark .system-section {
+    color: rgb(255, 255, 255);
+}
+
+.bottom-panel-surface.light .dash-placeholder,
+.bottom-panel-surface.light .indicator-section,
+.bottom-panel-surface.light .system-section {
+    color: rgb(36, 36, 40);
 }
 
 .dash-app-button {
@@ -29,8 +83,12 @@
     font-weight: 600;
 }
 
-.dash-overflow-button {
+.bottom-panel-surface.dark .dash-overflow-button {
     background-color: rgba(255, 255, 255, 0.10);
+}
+
+.bottom-panel-surface.light .dash-overflow-button {
+    background-color: rgba(0, 0, 0, 0.08);
 }
 
 .dash-expanded {
@@ -42,16 +100,66 @@
     spacing: 10px;
 }
 
-.search-icon {
+.bottom-panel-surface.dark .search-icon {
     color: rgba(255, 255, 255, 0.65);
+}
+
+.bottom-panel-surface.light .search-icon {
+    color: rgba(0, 0, 0, 0.58);
 }
 
 .search-entry {
     background-color: transparent;
     border: none;
     box-shadow: none;
-    color: white;
+    min-width: 0;
     padding: 0;
+}
+
+.bottom-panel-surface.dark .search-entry {
+    color: rgb(255, 255, 255);
+}
+
+.bottom-panel-surface.light .search-entry {
+    color: rgb(36, 36, 40);
+}
+
+.bottom-panel-surface.dark .search-entry StLabel.hint-text {
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.bottom-panel-surface.light .search-entry StLabel.hint-text {
+    color: rgba(36, 36, 40, 0.55);
+}
+
+.search-layout-button {
+    background-color: transparent;
+    border: none;
+    border-radius: 8px;
+    box-shadow: none;
+    font-weight: 600;
+    min-width: 24px;
+    padding: 5px 7px;
+}
+
+.bottom-panel-surface.dark .search-layout-button {
+    color: rgba(255, 255, 255, 0.80);
+}
+
+.bottom-panel-surface.light .search-layout-button {
+    color: rgba(36, 36, 40, 0.80);
+}
+
+.bottom-panel-surface.dark .search-layout-button:hover,
+.bottom-panel-surface.dark .search-layout-button:focus,
+.bottom-panel-surface.dark .search-layout-button:active {
+    background-color: rgba(255, 255, 255, 0.10);
+}
+
+.bottom-panel-surface.light .search-layout-button:hover,
+.bottom-panel-surface.light .search-layout-button:focus,
+.bottom-panel-surface.light .search-layout-button:active {
+    background-color: rgba(0, 0, 0, 0.08);
 }
 
 .search-suggestions {
@@ -72,16 +180,8 @@
     background-color: rgba(255, 255, 255, 0.10);
 }
 
-.indicator-section {
-    color: white;
-}
-
 .indicator-button {
     border-radius: 8px;
-}
-
-.indicator-button:hover {
-    background-color: rgba(255, 255, 255, 0.10);
 }
 
 .system-section {

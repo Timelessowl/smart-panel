@@ -1,6 +1,7 @@
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {BottomPanel} from './components/bottomPanel.js';
+import {ThemeManager} from './themeManager.js';
 
 export class MonitorManager {
     constructor({dashApps, indicators, openStubControls, overlayWindows}) {
@@ -9,6 +10,7 @@ export class MonitorManager {
         this._indicators = indicators;
         this._openStubControls = openStubControls;
         this._overlayWindows = overlayWindows;
+        this._themeManager = new ThemeManager();
         this._monitorsChangedId = Main.layoutManager.connect(
             'monitors-changed',
             () => this._rebuildPanels()
@@ -21,12 +23,14 @@ export class MonitorManager {
         this._destroyPanels();
 
         for (const monitor of Main.layoutManager.monitors) {
-            this._panels.push(new BottomPanel(monitor, {
+            const panel = new BottomPanel(monitor, {
                 dashApps: this._dashApps,
                 indicators: this._indicators,
                 openStubControls: this._openStubControls,
                 overlayWindows: this._overlayWindows,
-            }));
+            });
+            this._themeManager.addActor(panel.actor);
+            this._panels.push(panel);
         }
     }
 
@@ -53,8 +57,10 @@ export class MonitorManager {
     }
 
     _destroyPanels() {
-        for (const panel of this._panels)
+        for (const panel of this._panels) {
+            this._themeManager.removeActor(panel.actor);
             panel.destroy();
+        }
 
         this._panels = [];
     }
@@ -66,6 +72,8 @@ export class MonitorManager {
         }
 
         this._destroyPanels();
+        this._themeManager.destroy();
+        this._themeManager = null;
         this._dashApps = null;
         this._indicators = null;
         this._openStubControls = null;

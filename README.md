@@ -13,6 +13,18 @@ The transparent space between pieces remains part of the panel's input area.
 Layout values, edge margins, gaps, widths, and search suggestions can all be
 changed in `constant.js`.
 
+Every section receives the same theme-aware frame through
+`components/sectionFrameManager.js`. Its width is configured once with
+`SECTION_FRAME_WIDTH` in `constant.js`; individual section modules do not
+contain frame styling logic. Frames are separate non-interactive overlays, so
+their width never changes section content allocation. The frame is painted
+inside the section's existing outer dimensions, so the configured section width
+includes the frame.
+
+`themeManager.js` follows GNOME 48's system Dark Style preference and applies a
+`.dark` or `.light` class to every monitor panel. The two palettes live in
+`stylesheet.css`.
+
 `monitorManager.js` discovers monitors dynamically and owns one independent
 panel instance per monitor. Panels are rebuilt when the monitor layout changes.
 

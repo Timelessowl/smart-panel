@@ -6,6 +6,8 @@ export const PANEL_SIDE_MARGIN = 10;
 export const PANEL_BOTTOM_MARGIN = 20;
 export const PANEL_TOP_MARGIN = PANEL_BOTTOM_MARGIN;
 
+export const SECTION_FRAME_WIDTH = 10;
+
 export const START_SECTION_GAP = 6;
 export const END_SECTION_GAP = 12;
 export const SEARCH_CLEARANCE = 32;

@@ -11,6 +11,7 @@ export class SearchSection {
 
         this.actor = new St.BoxLayout({
             style_class: 'panel-piece search-section',
+            clip_to_allocation: true,
             y_align: Clutter.ActorAlign.CENTER,
         });
 
@@ -25,8 +26,21 @@ export class SearchSection {
             hint_text: 'Search apps…',
             can_focus: true,
             x_expand: true,
+            x_align: Clutter.ActorAlign.FILL,
         });
         this.actor.add_child(this.entry);
+
+        this._layoutButton = new St.Button({
+            label: 'EN',
+            style_class: 'search-layout-button',
+            accessible_name: 'English keyboard layout',
+            x_expand: false,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._layoutClickedId = this._layoutButton.connect('clicked', () => {
+            Main.notify('Keyboard layout', 'English (EN)');
+        });
+        this.actor.add_child(this._layoutButton);
 
         this._suggestionBox = new St.BoxLayout({
             vertical: true,
@@ -102,6 +116,7 @@ export class SearchSection {
     destroy() {
         this.entry.clutter_text.disconnect(this._textChangedId);
         this.entry.clutter_text.disconnect(this._focusOutId);
+        this._layoutButton.disconnect(this._layoutClickedId);
         this._suggestionBox.destroy();
     }
 }
