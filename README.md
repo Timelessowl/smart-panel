@@ -13,17 +13,16 @@ The transparent space between pieces remains part of the panel's input area.
 Layout values, edge margins, gaps, widths, and search suggestions can all be
 changed in `constant.js`.
 
-Every section receives the same theme-aware frame through
-`components/sectionFrameManager.js`. Its width is configured once with
-`SECTION_FRAME_WIDTH` in `constant.js`; individual section modules do not
-contain frame styling logic. Frames are separate non-interactive overlays, so
-their width never changes section content allocation. The frame is painted
-inside the section's existing outer dimensions, so the configured section width
-includes the frame.
+All five section classes derive from `components/baseSection.js`. The base class
+owns the shared surface, frame overlay, sizing, clipping, and the explicit
+`canExpand` capability. Dash and indicators opt into expansion; Debian, search,
+and system sections remain non-expandable. `SECTION_FRAME_WIDTH` in
+`constant.js` changes every section frame in one place.
 
 `themeManager.js` follows GNOME 48's system Dark Style preference and applies a
 `.dark` or `.light` class to every monitor panel. The two palettes live in
-`stylesheet.css`.
+`stylesheet.css`. Section surfaces and frames use solid GNOME-style colors;
+only intentionally empty space between sections remains transparent.
 
 `monitorManager.js` discovers monitors dynamically and owns one independent
 panel instance per monitor. Panels are rebuilt when the monitor layout changes.
@@ -42,7 +41,9 @@ a generic `setApps()` method.
 When the dash reaches its allocated boundary before the centered search field,
 its final cell becomes a `+N` overflow button. Selecting it opens a multi-row
 surface upward. Large populations remain vertically scrollable instead of
-growing beyond the monitor.
+growing beyond the monitor. Escape or a click outside closes the expanded dash.
+Outside clicks are observed without a modal input grab, so they still reach the
+window underneath.
 
 There is no build step and no package manager.
 

@@ -11,19 +11,22 @@ mkdir -p \
     "${extension_dir}/schemas" \
     "${extension_dir}/stub"
 
+rm -f "${extension_dir}/components/sectionFrameManager.js"
+
 install -m 0644 "${script_dir}/metadata.json" "${extension_dir}/metadata.json"
 install -m 0644 "${script_dir}/extension.js" "${extension_dir}/extension.js"
 install -m 0644 "${script_dir}/prefs.js" "${extension_dir}/prefs.js"
 install -m 0644 "${script_dir}/constant.js" "${extension_dir}/constant.js"
 install -m 0644 "${script_dir}/monitorManager.js" "${extension_dir}/monitorManager.js"
 install -m 0644 "${script_dir}/themeManager.js" "${extension_dir}/themeManager.js"
+install -m 0644 "${script_dir}/transientInputManager.js" "${extension_dir}/transientInputManager.js"
 install -m 0644 "${script_dir}/stylesheet.css" "${extension_dir}/stylesheet.css"
+install -m 0644 "${script_dir}/components/baseSection.js" "${extension_dir}/components/baseSection.js"
 install -m 0644 "${script_dir}/components/bottomPanel.js" "${extension_dir}/components/bottomPanel.js"
 install -m 0644 "${script_dir}/components/dashSection.js" "${extension_dir}/components/dashSection.js"
 install -m 0644 "${script_dir}/components/debianButton.js" "${extension_dir}/components/debianButton.js"
 install -m 0644 "${script_dir}/components/indicatorSection.js" "${extension_dir}/components/indicatorSection.js"
 install -m 0644 "${script_dir}/components/searchSection.js" "${extension_dir}/components/searchSection.js"
-install -m 0644 "${script_dir}/components/sectionFrameManager.js" "${extension_dir}/components/sectionFrameManager.js"
 install -m 0644 "${script_dir}/components/systemSection.js" "${extension_dir}/components/systemSection.js"
 install -m 0644 "${script_dir}/components/workAreaStrut.js" "${extension_dir}/components/workAreaStrut.js"
 install -m 0644 "${script_dir}/stub/dashPopulationTab.js" "${extension_dir}/stub/dashPopulationTab.js"

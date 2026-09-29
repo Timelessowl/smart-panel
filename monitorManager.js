@@ -2,6 +2,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {BottomPanel} from './components/bottomPanel.js';
 import {ThemeManager} from './themeManager.js';
+import {TransientInputManager} from './transientInputManager.js';
 
 export class MonitorManager {
     constructor({dashApps, indicators, openStubControls, overlayWindows}) {
@@ -11,6 +12,7 @@ export class MonitorManager {
         this._openStubControls = openStubControls;
         this._overlayWindows = overlayWindows;
         this._themeManager = new ThemeManager();
+        this._transientInputManager = new TransientInputManager();
         this._monitorsChangedId = Main.layoutManager.connect(
             'monitors-changed',
             () => this._rebuildPanels()
@@ -28,6 +30,8 @@ export class MonitorManager {
                 indicators: this._indicators,
                 openStubControls: this._openStubControls,
                 overlayWindows: this._overlayWindows,
+                themeManager: this._themeManager,
+                transientInputManager: this._transientInputManager,
             });
             this._themeManager.addActor(panel.actor);
             this._panels.push(panel);
@@ -72,6 +76,8 @@ export class MonitorManager {
         }
 
         this._destroyPanels();
+        this._transientInputManager.destroy();
+        this._transientInputManager = null;
         this._themeManager.destroy();
         this._themeManager = null;
         this._dashApps = null;

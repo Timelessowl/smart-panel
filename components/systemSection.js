@@ -4,12 +4,15 @@ import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-export class SystemSection {
+import {BaseSection} from './baseSection.js';
+
+export class SystemSection extends BaseSection {
     constructor() {
-        this.actor = new St.BoxLayout({
-            style_class: 'panel-piece system-section',
+        const content = new St.BoxLayout({
+            style_class: 'system-section',
             y_align: Clutter.ActorAlign.CENTER,
         });
+        super(content, {canExpand: false});
 
         this._dateButton = new St.Button({
             style_class: 'system-section-button date-button',
@@ -29,8 +32,8 @@ export class SystemSection {
             }),
         });
 
-        this.actor.add_child(this._dateButton);
-        this.actor.add_child(this._quickSettingsButton);
+        content.add_child(this._dateButton);
+        content.add_child(this._quickSettingsButton);
 
         this._dateClickedId = this._dateButton.connect('clicked', () => {
             Main.notify('Date menu', 'The date menu will be connected here.');
@@ -63,5 +66,7 @@ export class SystemSection {
             GLib.source_remove(this._clockSourceId);
             this._clockSourceId = 0;
         }
+
+        super.destroy();
     }
 }

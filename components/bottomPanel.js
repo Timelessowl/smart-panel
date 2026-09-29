@@ -7,7 +7,6 @@ import {DashSection} from './dashSection.js';
 import {DebianButton} from './debianButton.js';
 import {IndicatorSection} from './indicatorSection.js';
 import {SearchSection} from './searchSection.js';
-import {SectionFrameManager} from './sectionFrameManager.js';
 import {SystemSection} from './systemSection.js';
 import {WorkAreaStrut} from './workAreaStrut.js';
 
@@ -29,7 +28,14 @@ import {
 export class BottomPanel {
     constructor(
         monitor,
-        {dashApps, indicators, openStubControls, overlayWindows}
+        {
+            dashApps,
+            indicators,
+            openStubControls,
+            overlayWindows,
+            themeManager,
+            transientInputManager,
+        }
     ) {
         this._monitor = monitor;
 
@@ -41,7 +47,11 @@ export class BottomPanel {
         });
 
         this._debianButton = new DebianButton(openStubControls);
-        this._dashSection = new DashSection(dashApps);
+        this._dashSection = new DashSection(
+            dashApps,
+            themeManager,
+            transientInputManager
+        );
         this._searchSection = new SearchSection(SEARCH_SUGGESTIONS);
         this._indicatorSection = new IndicatorSection(indicators);
         this._systemSection = new SystemSection();
@@ -56,11 +66,6 @@ export class BottomPanel {
 
         for (const component of this._components)
             this.actor.add_child(component.actor);
-
-        this._sectionFrameManager = new SectionFrameManager(
-            this.actor,
-            this._components
-        );
 
         this._workAreaStrut = overlayWindows
             ? null
@@ -110,7 +115,6 @@ export class BottomPanel {
         );
         this._placeFromEnd(this._systemSection.actor, 0, SYSTEM_WIDTH);
 
-        this._sectionFrameManager.sync();
         this._searchSection.updatePopupPosition();
     }
 
@@ -138,9 +142,6 @@ export class BottomPanel {
     }
 
     destroy() {
-        this._sectionFrameManager.destroy();
-        this._sectionFrameManager = null;
-
         for (const component of this._components)
             component.destroy?.();
 

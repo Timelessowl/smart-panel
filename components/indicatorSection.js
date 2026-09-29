@@ -11,23 +11,26 @@ import {
     INDICATOR_MIN_WIDTH,
     INDICATOR_WIDTH_STEP,
 } from '../constant.js';
+import {BaseSection} from './baseSection.js';
 
-export class IndicatorSection {
+export class IndicatorSection extends BaseSection {
     constructor(indicators = []) {
-        this._indicators = [];
-        this._menus = [];
-
-        this.actor = new St.Widget({
-            style_class: 'panel-piece indicator-section',
+        const content = new St.Widget({
+            style_class: 'indicator-section',
             accessible_name: 'Indicator area',
             layout_manager: new Clutter.BinLayout(),
         });
+        super(content, {canExpand: true});
+
+        this._indicators = [];
+        this._menus = [];
+
         this._indicatorBox = new St.BoxLayout({
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.CENTER,
             style: `spacing: ${INDICATOR_ITEM_SPACING}px;`,
         });
-        this.actor.add_child(this._indicatorBox);
+        content.add_child(this._indicatorBox);
 
         this.setIndicators(indicators);
     }
@@ -92,5 +95,6 @@ export class IndicatorSection {
     destroy() {
         this._clearIndicators();
         this._indicators = [];
+        super.destroy();
     }
 }

@@ -4,18 +4,19 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {MAX_VISIBLE_SUGGESTIONS} from '../constant.js';
+import {BaseSection} from './baseSection.js';
 
-export class SearchSection {
+export class SearchSection extends BaseSection {
     constructor(suggestions = []) {
-        this._suggestions = [...suggestions];
-
-        this.actor = new St.BoxLayout({
-            style_class: 'panel-piece search-section',
-            clip_to_allocation: true,
+        const content = new St.BoxLayout({
+            style_class: 'search-section',
             y_align: Clutter.ActorAlign.CENTER,
         });
+        super(content, {canExpand: false});
 
-        this.actor.add_child(new St.Icon({
+        this._suggestions = [...suggestions];
+
+        content.add_child(new St.Icon({
             icon_name: 'system-search-symbolic',
             icon_size: 20,
             style_class: 'search-icon',
@@ -28,7 +29,7 @@ export class SearchSection {
             x_expand: true,
             x_align: Clutter.ActorAlign.FILL,
         });
-        this.actor.add_child(this.entry);
+        content.add_child(this.entry);
 
         this._layoutButton = new St.Button({
             label: 'EN',
@@ -40,7 +41,7 @@ export class SearchSection {
         this._layoutClickedId = this._layoutButton.connect('clicked', () => {
             Main.notify('Keyboard layout', 'English (EN)');
         });
-        this.actor.add_child(this._layoutButton);
+        content.add_child(this._layoutButton);
 
         this._suggestionBox = new St.BoxLayout({
             vertical: true,
@@ -118,5 +119,6 @@ export class SearchSection {
         this.entry.clutter_text.disconnect(this._focusOutId);
         this._layoutButton.disconnect(this._layoutClickedId);
         this._suggestionBox.destroy();
+        super.destroy();
     }
 }

@@ -10,6 +10,7 @@ import {
     DASH_PADDING,
     PANEL_HEIGHT,
 } from '../constant.js';
+import {BaseSection} from './baseSection.js';
 
 const DEFAULT_APPS = [
     {iconName: 'folder-symbolic', name: 'Files'},
@@ -17,26 +18,29 @@ const DEFAULT_APPS = [
     {iconName: 'utilities-terminal-symbolic', name: 'Terminal'},
 ];
 
-export class DashSection {
-    constructor(apps = DEFAULT_APPS) {
+export class DashSection extends BaseSection {
+    constructor(
+        apps = DEFAULT_APPS,
+        themeManager = null,
+        transientInputManager = null
+    ) {
+        const dash = new St.BoxLayout({
+            style_class: 'dash-placeholder',
+            style: `padding: ${DASH_PADDING}px; spacing: ${DASH_ITEM_SPACING}px;`,
+        });
+        super(dash, {
+            canExpand: true,
+            useNaturalWidth: true,
+        });
+
         this._apps = [];
         this._availableWidth = 0;
         this._maxExpansionHeight = PANEL_HEIGHT;
         this._expandedSurface = null;
-        this._stageCapturedEventId = 0;
-
-        this.actor = new St.Widget({
-            clip_to_allocation: true,
-            layout_manager: new Clutter.FixedLayout(),
-        });
-
-        this._dash = new St.BoxLayout({
-            style_class: 'panel-piece dash-placeholder',
-            style: `padding: ${DASH_PADDING}px; spacing: ${DASH_ITEM_SPACING}px;`,
-        });
-        this._dash.set_position(0, 0);
-        this._dash.set_height(PANEL_HEIGHT);
-        this.actor.add_child(this._dash);
+        this._dismissRegistration = null;
+        this._dash = dash;
+        this._themeManager = themeManager;
+        this._transientInputManager = transientInputManager;
 
         this.setApps(apps);
     }
@@ -83,6 +87,8 @@ export class DashSection {
             overflowButton.connect('clicked', () => this._openExpanded());
             this._dash.add_child(overflowButton);
         }
+
+        this.syncSurface();
     }
 
     _getColumnCapacity() {
@@ -177,48 +183,27 @@ export class DashSection {
         );
 
         this._dash.hide();
-        Main.layoutManager.addChrome(this._expandedSurface, {
+        this._themeManager?.addActor(this._expandedSurface);
+        Main.layoutManager.addTopChrome(this._expandedSurface, {
             affectsInputRegion: true,
             affectsStruts: false,
             trackFullscreen: true,
         });
-        this._stageCapturedEventId = global.stage.connect(
-            'captured-event',
-            (_actor, event) => this._handleCapturedEvent(event)
+        this._dismissRegistration = this._transientInputManager?.register(
+            this._expandedSurface,
+            () => this._closeExpanded()
         );
-    }
-
-    _handleCapturedEvent(event) {
-        const isEscape = event.type() === Clutter.EventType.KEY_PRESS &&
-            event.get_key_symbol() === Clutter.KEY_Escape;
-
-        if (isEscape) {
-            this._closeExpanded();
-            return Clutter.EVENT_STOP;
-        }
-
-        if (event.type() === Clutter.EventType.BUTTON_PRESS) {
-            const source = event.get_source();
-            const clickedInside = source &&
-                (source === this._expandedSurface ||
-                    this._expandedSurface.contains(source));
-
-            if (!clickedInside)
-                this._closeExpanded();
-        }
-
-        return Clutter.EVENT_PROPAGATE;
     }
 
     _closeExpanded() {
         if (!this._expandedSurface)
             return;
 
-        if (this._stageCapturedEventId) {
-            global.stage.disconnect(this._stageCapturedEventId);
-            this._stageCapturedEventId = 0;
-        }
+        this._transientInputManager?.unregister(this._dismissRegistration);
+        this._dismissRegistration = null;
 
+        this._themeManager?.removeActor(this._expandedSurface);
+        Main.layoutManager.removeChrome(this._expandedSurface);
         this._expandedSurface.destroy();
         this._expandedSurface = null;
         this._dash.show();
@@ -226,5 +211,8 @@ export class DashSection {
 
     destroy() {
         this._closeExpanded();
+        this._themeManager = null;
+        this._transientInputManager = null;
+        super.destroy();
     }
 }
