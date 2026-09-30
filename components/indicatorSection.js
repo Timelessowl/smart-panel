@@ -1,4 +1,5 @@
 import Clutter from 'gi://Clutter';
+import GObject from 'gi://GObject';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -13,17 +14,21 @@ import {
 } from '../constant.js';
 import {BaseSection} from './baseSection.js';
 
-export class IndicatorSection extends BaseSection {
-    constructor(indicators = []) {
+export const IndicatorSection = GObject.registerClass(
+class IndicatorSection extends BaseSection {
+    constructor(indicators = [], scaleFactor = 1) {
+        super({canExpand: true});
+
         const content = new St.Widget({
             style_class: 'indicator-section',
             accessible_name: 'Indicator area',
             layout_manager: new Clutter.BinLayout(),
         });
-        super(content, {canExpand: true});
+        this._setContent(content);
 
         this._indicators = [];
         this._menus = [];
+        this._scaleFactor = scaleFactor;
 
         this._indicatorBox = new St.BoxLayout({
             x_align: Clutter.ActorAlign.CENTER,
@@ -54,7 +59,7 @@ export class IndicatorSection extends BaseSection {
         for (const indicator of this._indicators)
             this._addIndicator(indicator);
 
-        this.actor.visible = this.hasIndicators;
+        this.visible = this.hasIndicators;
     }
 
     _addIndicator({iconName, name, menuItems = []}) {
@@ -67,10 +72,11 @@ export class IndicatorSection extends BaseSection {
                 icon_size: INDICATOR_ICON_SIZE,
             }),
         });
-        button.set_size(INDICATOR_ITEM_SIZE, INDICATOR_ITEM_SIZE);
+        const itemSize = Math.round(INDICATOR_ITEM_SIZE * this._scaleFactor);
+        button.set_size(itemSize, itemSize);
 
         const menu = new PopupMenu.PopupMenu(button, 0.5, St.Side.BOTTOM);
-        Main.uiGroup.add_child(menu.actor);
+        Main.layoutManager.uiGroup.add_child(menu.actor);
         menu.actor.hide();
 
         for (const {label, action} of menuItems) {
@@ -95,6 +101,7 @@ export class IndicatorSection extends BaseSection {
     destroy() {
         this._clearIndicators();
         this._indicators = [];
+        this._scaleFactor = 1;
         super.destroy();
     }
-}
+});

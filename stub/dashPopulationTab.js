@@ -1,17 +1,19 @@
 import Clutter from 'gi://Clutter';
+import GObject from 'gi://GObject';
 import St from 'gi://St';
 
 export const MIN_DASH_ITEMS = 3;
 export const MAX_DASH_ITEMS = 100;
 
-export class DashPopulationTab {
+export const DashPopulationTab = GObject.registerClass(
+class DashPopulationTab extends St.BoxLayout {
     constructor(initialCount) {
-        this.actor = new St.BoxLayout({
+        super({
             vertical: true,
             style_class: 'stub-tab-content',
         });
 
-        this.actor.add_child(new St.Label({
+        this.add_child(new St.Label({
             text: 'Number of dash items',
             style_class: 'stub-field-label',
             x_align: Clutter.ActorAlign.START,
@@ -40,9 +42,9 @@ export class DashPopulationTab {
         controls.add_child(this._decreaseButton);
         controls.add_child(this._entry);
         controls.add_child(this._increaseButton);
-        this.actor.add_child(controls);
+        this.add_child(controls);
 
-        this.actor.add_child(new St.Label({
+        this.add_child(new St.Label({
             text: `Allowed range: ${MIN_DASH_ITEMS}–${MAX_DASH_ITEMS}`,
             style_class: 'stub-field-help',
             x_align: Clutter.ActorAlign.CENTER,
@@ -76,5 +78,6 @@ export class DashPopulationTab {
     destroy() {
         this._decreaseButton.disconnect(this._decreaseId);
         this._increaseButton.disconnect(this._increaseId);
+        super.destroy();
     }
-}
+});

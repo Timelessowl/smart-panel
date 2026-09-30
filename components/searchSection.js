@@ -1,4 +1,5 @@
 import Clutter from 'gi://Clutter';
+import GObject from 'gi://GObject';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -6,15 +7,18 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {MAX_VISIBLE_SUGGESTIONS} from '../constant.js';
 import {BaseSection} from './baseSection.js';
 
-export class SearchSection extends BaseSection {
-    constructor(suggestions = []) {
+export const SearchSection = GObject.registerClass(
+class SearchSection extends BaseSection {
+    constructor(suggestions = [], scaleFactor = 1) {
+        super({canExpand: false});
+
         const content = new St.BoxLayout({
             style_class: 'search-section',
-            y_align: Clutter.ActorAlign.CENTER,
         });
-        super(content, {canExpand: false});
+        this._setContent(content);
 
         this._suggestions = [...suggestions];
+        this._scaleFactor = scaleFactor;
 
         content.add_child(new St.Icon({
             icon_name: 'system-search-symbolic',
@@ -48,7 +52,11 @@ export class SearchSection extends BaseSection {
             style_class: 'search-suggestions',
             visible: false,
         });
-        Main.uiGroup.add_child(this._suggestionBox);
+        Main.layoutManager.addTopChrome(this._suggestionBox, {
+            affectsInputRegion: true,
+            affectsStruts: false,
+            trackFullscreen: true,
+        });
 
         this._textChangedId = this.entry.clutter_text.connect(
             'text-changed',
@@ -94,7 +102,9 @@ export class SearchSection extends BaseSection {
         }
 
         if (matches.length > 0) {
-            this._suggestionBox.set_height(matches.length * 40 + 12);
+            this._suggestionBox.set_height(
+                Math.round((matches.length * 40 + 12) * this._scaleFactor)
+            );
             this.updatePopupPosition();
             this._suggestionBox.show();
         } else {
@@ -103,14 +113,15 @@ export class SearchSection extends BaseSection {
     }
 
     updatePopupPosition() {
-        if (!this.actor.mapped)
+        if (!this.mapped)
             return;
 
-        const [x, y] = this.actor.get_transformed_position();
-        this._suggestionBox.set_width(this.actor.width);
+        const [x, y] = this.get_transformed_position();
+        this._suggestionBox.set_width(this.width);
         this._suggestionBox.set_position(
             Math.round(x),
-            Math.round(y - this._suggestionBox.height - 8)
+            Math.round(y - this._suggestionBox.height -
+                8 * this._scaleFactor)
         );
     }
 
@@ -118,7 +129,9 @@ export class SearchSection extends BaseSection {
         this.entry.clutter_text.disconnect(this._textChangedId);
         this.entry.clutter_text.disconnect(this._focusOutId);
         this._layoutButton.disconnect(this._layoutClickedId);
+        Main.layoutManager.removeChrome(this._suggestionBox);
         this._suggestionBox.destroy();
+        this._scaleFactor = 1;
         super.destroy();
     }
-}
+});

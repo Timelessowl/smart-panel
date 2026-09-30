@@ -1,87 +1,56 @@
 import Clutter from 'gi://Clutter';
+import GObject from 'gi://GObject';
 import St from 'gi://St';
 
 import {SECTION_FRAME_WIDTH} from '../constant.js';
 
-export class BaseSection {
-    constructor(
-        contentActor,
-        {canExpand = false, useNaturalWidth = false} = {}
-    ) {
-        this._contentActor = contentActor;
-        this._canExpand = false;
-        this._useNaturalWidth = useNaturalWidth;
-
-        this.actor = new St.Widget({
+export const BaseSection = GObject.registerClass(
+class BaseSection extends St.Widget {
+    constructor({canExpand = false} = {}) {
+        super({
             style_class: 'panel-section',
-            layout_manager: new Clutter.FixedLayout(),
+            layout_manager: new Clutter.BinLayout(),
             clip_to_allocation: true,
         });
-        this.canExpand = canExpand;
 
-        this._contentActor.add_style_class_name('panel-piece');
-        this._frameActor = new St.Widget({
+        this._canExpand = Boolean(canExpand);
+        this.x_expand = this._canExpand;
+        this._content = null;
+        this._frame = new St.Widget({
             style_class: 'panel-section-frame',
             style: `border-width: ${SECTION_FRAME_WIDTH}px;`,
             reactive: false,
+            x_expand: true,
+            y_expand: true,
         });
-
-        this.actor.add_child(this._contentActor);
-        this.actor.add_child(this._frameActor);
-
-        this._allocationId = this.actor.connect(
-            'notify::allocation',
-            () => this.syncSurface()
-        );
-        this._contentVisibilityId = this._contentActor.connect(
-            'notify::visible',
-            () => this.syncSurface()
-        );
+        this.add_child(this._frame);
     }
 
     get canExpand() {
         return this._canExpand;
     }
 
-    set canExpand(canExpand) {
-        this._canExpand = Boolean(canExpand);
-        this.actor.x_expand = this._canExpand;
+    _setContent(content) {
+        if (this._content)
+            throw new Error('A panel section can only have one content actor');
+
+        this._content = content;
+        this._content.add_style_class_name('panel-piece');
+        this._content.x_expand = true;
+        this._content.y_expand = true;
+        this._content.x_align = Clutter.ActorAlign.FILL;
+        this._content.y_align = Clutter.ActorAlign.FILL;
+        this.insert_child_below(this._content, this._frame);
     }
 
-    syncSurface() {
-        let width = this.actor.width;
-
-        if (this._useNaturalWidth) {
-            // The previous allocation must not become the next preferred-width
-            // request. This matters when an expandable section adds children.
-            this._contentActor.set_width(-1);
-            const [, naturalWidth] = this._contentActor
-                .get_preferred_width(-1);
-            width = Math.min(width, naturalWidth);
-        }
-
-        const height = this.actor.height;
-        this._contentActor.set_position(0, 0);
-        this._contentActor.set_size(width, height);
-        this._frameActor.set_position(0, 0);
-        this._frameActor.set_size(width, height);
-        this._frameActor.visible = this._contentActor.visible;
+    _setContentVisible(visible) {
+        this._content.visible = visible;
+        this._frame.visible = visible;
     }
 
     destroy() {
-        if (this._allocationId) {
-            this.actor.disconnect(this._allocationId);
-            this._allocationId = 0;
-        }
-
-        if (this._contentVisibilityId) {
-            this._contentActor.disconnect(this._contentVisibilityId);
-            this._contentVisibilityId = 0;
-        }
-
-        this._contentActor = null;
-        this._frameActor = null;
-        this._canExpand = false;
-        this._useNaturalWidth = false;
+        this._content = null;
+        this._frame = null;
+        super.destroy();
     }
-}
+});

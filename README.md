@@ -13,11 +13,14 @@ The transparent space between pieces remains part of the panel's input area.
 Layout values, edge margins, gaps, widths, and search suggestions can all be
 changed in `constant.js`.
 
-All five section classes derive from `components/baseSection.js`. The base class
-owns the shared surface, frame overlay, sizing, clipping, and the explicit
-`canExpand` capability. Dash and indicators opt into expansion; Debian, search,
-and system sections remain non-expandable. `SECTION_FRAME_WIDTH` in
-`constant.js` changes every section frame in one place.
+All five section classes derive from the GObject-registered `BaseSection`, which
+is itself an `St.Widget`. Registered actors use standard JavaScript constructors
+and are actors directly; there is no legacy `_init()` or `this.actor` wrapper.
+The base class owns only the shared surface, frame overlay, clipping, and
+explicit `canExpand` capability. `BottomPanel._updateGeometry()` is the single
+owner of panel and section placement and sizing. Dash and indicators opt into
+expansion; Debian, search, and system sections do not. `SECTION_FRAME_WIDTH` in
+`constant.js` changes every frame in one place.
 
 `themeManager.js` follows GNOME 48's system Dark Style preference and applies a
 `.dark` or `.light` class to every monitor panel. The two palettes live in
@@ -26,6 +29,10 @@ only intentionally empty space between sections remains transparent.
 
 `monitorManager.js` discovers monitors dynamically and owns one independent
 panel instance per monitor. Panels are rebuilt when the monitor layout changes.
+On X11, `displayScale.js` converts logical layout constants to physical stage
+pixels using GNOME Shell's theme scale factor and rebuilds panels if that factor
+changes. Wayland deliberately uses a factor of one because Mutter already gives
+the extension scaled logical coordinates there.
 
 ## Stub controls
 

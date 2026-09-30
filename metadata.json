@@ -4,5 +4,5 @@
   "description": "A configurable bottom panel for every monitor.",
   "version": 1,
   "settings-schema": "org.gnome.shell.extensions.simple-bottom-panel",
-  "shell-version": ["45", "46", "47", "48", "49", "50", "51"]
+  "shell-version": ["48"]
 }

@@ -1,4 +1,5 @@
 import Gio from 'gi://Gio';
+import GObject from 'gi://GObject';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -6,8 +7,11 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 import {BaseSection} from './baseSection.js';
 
-export class DebianButton extends BaseSection {
+export const DebianButton = GObject.registerClass(
+class DebianButton extends BaseSection {
     constructor(openStubControls) {
+        super({canExpand: false});
+
         const debianIcon = Gio.ThemedIcon.new_from_names([
             'distributor-logo-debian',
             'debian-swirl',
@@ -22,12 +26,12 @@ export class DebianButton extends BaseSection {
                 icon_size: 30,
             }),
         });
-        super(button, {canExpand: false});
+        this._setContent(button);
         this._button = button;
 
         this._menu = new PopupMenu.PopupMenu(this._button, 0.5, St.Side.BOTTOM);
         this._menu.actor.add_style_class_name('debian-popup-menu');
-        Main.uiGroup.add_child(this._menu.actor);
+        Main.layoutManager.uiGroup.add_child(this._menu.actor);
         this._menu.actor.hide();
 
         const notificationItem = new PopupMenu.PopupMenuItem('Show notification');
@@ -54,4 +58,4 @@ export class DebianButton extends BaseSection {
         this._button = null;
         super.destroy();
     }
-}
+});

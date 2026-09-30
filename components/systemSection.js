@@ -1,18 +1,21 @@
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {BaseSection} from './baseSection.js';
 
-export class SystemSection extends BaseSection {
+export const SystemSection = GObject.registerClass(
+class SystemSection extends BaseSection {
     constructor() {
+        super({canExpand: false});
+
         const content = new St.BoxLayout({
             style_class: 'system-section',
-            y_align: Clutter.ActorAlign.CENTER,
         });
-        super(content, {canExpand: false});
+        this._setContent(content);
 
         this._dateButton = new St.Button({
             style_class: 'system-section-button date-button',
@@ -69,4 +72,4 @@ export class SystemSection extends BaseSection {
 
         super.destroy();
     }
-}
+});

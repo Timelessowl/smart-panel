@@ -1,4 +1,5 @@
 import Clutter from 'gi://Clutter';
+import GObject from 'gi://GObject';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -25,7 +26,8 @@ import {
     SYSTEM_WIDTH,
 } from '../constant.js';
 
-export class BottomPanel {
+export const BottomPanel = GObject.registerClass(
+class BottomPanel extends St.Widget {
     constructor(
         monitor,
         {
@@ -35,25 +37,34 @@ export class BottomPanel {
             overlayWindows,
             themeManager,
             transientInputManager,
+            scaleFactor = 1,
         }
     ) {
-        this._monitor = monitor;
-
-        this.actor = new St.Widget({
+        super({
             style_class: 'bottom-panel-surface',
             layout_manager: new Clutter.FixedLayout(),
             clip_to_allocation: false,
             reactive: true,
         });
 
+        this._monitor = monitor;
+        this._scaleFactor = scaleFactor;
+
         this._debianButton = new DebianButton(openStubControls);
         this._dashSection = new DashSection(
             dashApps,
             themeManager,
-            transientInputManager
+            transientInputManager,
+            scaleFactor
         );
-        this._searchSection = new SearchSection(SEARCH_SUGGESTIONS);
-        this._indicatorSection = new IndicatorSection(indicators);
+        this._searchSection = new SearchSection(
+            SEARCH_SUGGESTIONS,
+            scaleFactor
+        );
+        this._indicatorSection = new IndicatorSection(
+            indicators,
+            scaleFactor
+        );
         this._systemSection = new SystemSection();
 
         this._components = [
@@ -65,16 +76,18 @@ export class BottomPanel {
         ];
 
         for (const component of this._components)
-            this.actor.add_child(component.actor);
+            this.add_child(component);
 
         this._workAreaStrut = overlayWindows
             ? null
             : new WorkAreaStrut(
                 monitor,
-                PANEL_TOP_MARGIN + PANEL_HEIGHT + PANEL_BOTTOM_MARGIN
+                this._scale(
+                    PANEL_TOP_MARGIN + PANEL_HEIGHT + PANEL_BOTTOM_MARGIN
+                )
             );
 
-        Main.layoutManager.addChrome(this.actor, {
+        Main.layoutManager.addChrome(this, {
             affectsInputRegion: true,
             affectsStruts: false,
             trackFullscreen: true,
@@ -85,55 +98,91 @@ export class BottomPanel {
 
     _updateGeometry() {
         const monitor = this._monitor;
+        const panelHeight = this._scale(PANEL_HEIGHT);
+        const sideMargin = this._scale(PANEL_SIDE_MARGIN);
+        const bottomMargin = this._scale(PANEL_BOTTOM_MARGIN);
 
-        const panelWidth = Math.max(0, monitor.width - PANEL_SIDE_MARGIN * 2);
+        const panelWidth = Math.max(0, monitor.width - sideMargin * 2);
         const searchWidth = Math.min(
-            SEARCH_MAX_WIDTH,
+            this._scale(SEARCH_MAX_WIDTH),
             Math.round(panelWidth * SEARCH_WIDTH_RATIO)
         );
         const searchX = Math.round((panelWidth - searchWidth) / 2);
-        const dashStart = PANEL_HEIGHT + START_SECTION_GAP;
-        const dashWidth = Math.max(0, searchX - SEARCH_CLEARANCE - dashStart);
-
-        this.actor.set_size(panelWidth, PANEL_HEIGHT);
-        this.actor.set_position(
-            monitor.x + PANEL_SIDE_MARGIN,
-            monitor.y + monitor.height - PANEL_HEIGHT - PANEL_BOTTOM_MARGIN
+        const dashStart = panelHeight + this._scale(START_SECTION_GAP);
+        const dashMaxWidth = Math.max(
+            0,
+            searchX - this._scale(SEARCH_CLEARANCE) - dashStart
         );
 
-        this._placeFromStart(this._debianButton.actor, 0, PANEL_HEIGHT);
-        this._placeFromStart(this._dashSection.actor, dashStart, dashWidth);
+        this.set_size(panelWidth, panelHeight);
+        this.set_position(
+            monitor.x + sideMargin,
+            monitor.y + monitor.height - panelHeight - bottomMargin
+        );
+
         this._dashSection.setAvailableSize(
+            dashMaxWidth,
+            monitor.height - bottomMargin -
+                this._scale(DASH_EXPANSION_TOP_MARGIN)
+        );
+        this._dashSection.set_width(-1);
+        const [, dashNaturalWidth] = this._dashSection
+            .get_preferred_width(panelHeight);
+        const dashWidth = Math.min(
+            dashMaxWidth,
+            Math.ceil(dashNaturalWidth)
+        );
+
+        this._placeFromStart(this._debianButton, 0, panelHeight, panelHeight);
+        this._placeFromStart(
+            this._dashSection,
+            dashStart,
             dashWidth,
-            monitor.height - PANEL_BOTTOM_MARGIN - DASH_EXPANSION_TOP_MARGIN
+            panelHeight
         );
-        this._place(this._searchSection.actor, searchX, searchWidth);
+        this._place(
+            this._searchSection,
+            searchX,
+            searchWidth,
+            panelHeight
+        );
         this._placeFromEnd(
-            this._indicatorSection.actor,
-            SYSTEM_WIDTH + END_SECTION_GAP,
-            this._indicatorSection.preferredWidth
+            this._indicatorSection,
+            this._scale(SYSTEM_WIDTH + END_SECTION_GAP),
+            this._scale(this._indicatorSection.preferredWidth),
+            panelHeight
         );
-        this._placeFromEnd(this._systemSection.actor, 0, SYSTEM_WIDTH);
+        this._placeFromEnd(
+            this._systemSection,
+            0,
+            this._scale(SYSTEM_WIDTH),
+            panelHeight
+        );
 
         this._searchSection.updatePopupPosition();
     }
 
-    _place(actor, x, width) {
-        actor.set_position(x, 0);
-        actor.set_size(width, PANEL_HEIGHT);
+    _scale(value) {
+        return Math.round(value * this._scaleFactor);
     }
 
-    _placeFromStart(actor, startOffset, width) {
-        this._place(actor, startOffset, width);
+    _place(section, x, width, height) {
+        section.set_position(x, 0);
+        section.set_size(width, height);
     }
 
-    _placeFromEnd(actor, endOffset, width) {
-        const x = this.actor.width - endOffset - width;
-        this._place(actor, x, width);
+    _placeFromStart(section, startOffset, width, height) {
+        this._place(section, startOffset, width, height);
+    }
+
+    _placeFromEnd(section, endOffset, width, height) {
+        const x = this.width - endOffset - width;
+        this._place(section, x, width, height);
     }
 
     setDashApps(dashApps) {
         this._dashSection.setApps(dashApps);
+        this._updateGeometry();
     }
 
     setIndicators(indicators) {
@@ -147,9 +196,10 @@ export class BottomPanel {
 
         this._workAreaStrut?.destroy();
         this._workAreaStrut = null;
-        this.actor.destroy();
-        this.actor = null;
+        Main.layoutManager.removeChrome(this);
         this._monitor = null;
+        this._scaleFactor = 1;
         this._components = [];
+        super.destroy();
     }
-}
+});

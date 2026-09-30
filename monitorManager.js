@@ -1,6 +1,7 @@
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {BottomPanel} from './components/bottomPanel.js';
+import {DisplayScale} from './displayScale.js';
 import {ThemeManager} from './themeManager.js';
 import {TransientInputManager} from './transientInputManager.js';
 
@@ -13,6 +14,7 @@ export class MonitorManager {
         this._overlayWindows = overlayWindows;
         this._themeManager = new ThemeManager();
         this._transientInputManager = new TransientInputManager();
+        this._displayScale = new DisplayScale(() => this._rebuildPanels());
         this._monitorsChangedId = Main.layoutManager.connect(
             'monitors-changed',
             () => this._rebuildPanels()
@@ -32,8 +34,9 @@ export class MonitorManager {
                 overlayWindows: this._overlayWindows,
                 themeManager: this._themeManager,
                 transientInputManager: this._transientInputManager,
+                scaleFactor: this._displayScale.factor,
             });
-            this._themeManager.addActor(panel.actor);
+            this._themeManager.addActor(panel);
             this._panels.push(panel);
         }
     }
@@ -62,7 +65,7 @@ export class MonitorManager {
 
     _destroyPanels() {
         for (const panel of this._panels) {
-            this._themeManager.removeActor(panel.actor);
+            this._themeManager.removeActor(panel);
             panel.destroy();
         }
 
@@ -76,6 +79,8 @@ export class MonitorManager {
         }
 
         this._destroyPanels();
+        this._displayScale.destroy();
+        this._displayScale = null;
         this._transientInputManager.destroy();
         this._transientInputManager = null;
         this._themeManager.destroy();

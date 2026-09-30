@@ -107,10 +107,10 @@ export class StubController {
                 button.remove_style_class_name('selected');
         }
 
-        const actor = tabName === 'dash'
-            ? this._dashPopulationTab.actor
-            : this._indicatorPopulationTab.actor;
-        this._tabContent.set_child(actor);
+        const tab = tabName === 'dash'
+            ? this._dashPopulationTab
+            : this._indicatorPopulationTab;
+        this._tabContent.set_child(tab);
     }
 
     _applyStubValues() {
