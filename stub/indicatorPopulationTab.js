@@ -5,8 +5,11 @@ import St from 'gi://St';
 export const MIN_INDICATORS = 0;
 export const MAX_INDICATORS = 10;
 
-export const IndicatorPopulationTab = GObject.registerClass(
-class IndicatorPopulationTab extends St.BoxLayout {
+export class IndicatorPopulationTab extends St.BoxLayout {
+    static {
+        GObject.registerClass(this);
+    }
+
     constructor(initialCount) {
         super({
             vertical: true,
@@ -80,4 +83,4 @@ class IndicatorPopulationTab extends St.BoxLayout {
         this._increaseButton.disconnect(this._increaseId);
         super.destroy();
     }
-});
+}

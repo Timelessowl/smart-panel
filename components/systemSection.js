@@ -7,15 +7,18 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {BaseSection} from './baseSection.js';
 
-export const SystemSection = GObject.registerClass(
-class SystemSection extends BaseSection {
+export class SystemSection extends BaseSection {
+    static {
+        GObject.registerClass(this);
+    }
+
     constructor() {
-        super({canExpand: false});
+        super();
 
         const content = new St.BoxLayout({
             style_class: 'system-section',
         });
-        this._setContent(content);
+        this.setSectionContent(content);
 
         this._dateButton = new St.Button({
             style_class: 'system-section-button date-button',
@@ -72,4 +75,4 @@ class SystemSection extends BaseSection {
 
         super.destroy();
     }
-});
+}

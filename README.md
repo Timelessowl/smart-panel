@@ -4,22 +4,23 @@ A minimal GNOME Shell extension that displays five independent panel pieces at
 the bottom of every connected monitor:
 
 1. A square Debian menu button.
-2. An expandable dash placeholder with three app icons.
-3. A centered search entry with suggestions.
+2. An expandable dash placeholder starting with five app icons.
+3. A centered, currently passive search entry.
 4. A blank 2:1 indicator area.
 5. Date and quick-settings placeholders.
 
 The transparent space between pieces remains part of the panel's input area.
-Layout values, panel padding, gaps, widths, and search suggestions can all be
-changed in `constant.js`. `PANEL_HEIGHT` is derived from `SECTION_HEIGHT` plus
+Layout values, panel padding, gaps, and widths can all be changed in
+`constant.js`. `PANEL_HEIGHT` is derived from `SECTION_HEIGHT` plus
 the top and bottom padding. Horizontal padding also stays inside the full-width
 panel actor, so visual outer spacing never becomes a pass-through gap.
 
 All five section classes derive from the GObject-registered `BaseSection`, which
 is itself an `St.Widget`. Registered actors use standard JavaScript constructors
 and are actors directly; there is no legacy `_init()` or `this.actor` wrapper.
-The base class owns only the shared surface, frame overlay, clipping, and
-explicit `canExpand` capability. `BottomPanel._updateGeometry()` is the single
+The base class owns only the shared surface, frame overlay, clipping, and a
+plain `canExpand` property. Expandable sections set that property in their own
+constructors. `BottomPanel._updateGeometry()` is the single
 owner of panel and section placement and sizing. Dash and indicators opt into
 expansion; Debian, search, and system sections do not. `SECTION_FRAME_WIDTH` in
 `constant.js` changes every frame in one place.
@@ -31,10 +32,8 @@ only intentionally empty space between sections remains transparent.
 
 `monitorManager.js` discovers monitors dynamically and owns one independent
 panel instance per monitor. Panels are rebuilt when the monitor layout changes.
-On X11, `displayScale.js` converts logical layout constants to physical stage
-pixels using GNOME Shell's theme scale factor and rebuilds panels if that factor
-changes. Wayland deliberately uses a factor of one because Mutter already gives
-the extension scaled logical coordinates there.
+Each panel determines its own scale in its constructor: Wayland uses a factor of
+one, while X11 uses that monitor's `geometry_scale`.
 
 ## Stub controls
 
@@ -56,18 +55,11 @@ window underneath.
 
 There is no build step and no package manager.
 
-## Preferences
+## Window reservation
 
-By default, the panel reserves its area on every monitor so maximized windows
-stop above it. Open the extension preferences and enable **Allow windows behind
-the panel** to restore overlay behavior where windows can extend beneath it.
-The reservation is handled by a transparent, non-interactive strip attached to
-the bottom edge; the visible floating pieces keep their inset layout. The
-reserved work area includes the panel's top and bottom padding.
-
-```sh
-gnome-extensions prefs simple-bottom-panel@local
-```
+The panel always reserves its area on every monitor, so maximized windows stop
+above it. The bottom panel actor itself is registered as chrome and reserves its
+complete height, including the top and bottom padding.
 
 ## Install
 

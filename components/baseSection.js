@@ -4,17 +4,19 @@ import St from 'gi://St';
 
 import {SECTION_FRAME_WIDTH} from '../constant.js';
 
-export const BaseSection = GObject.registerClass(
-class BaseSection extends St.Widget {
-    constructor({canExpand = false} = {}) {
+export class BaseSection extends St.Widget {
+    static {
+        GObject.registerClass(this);
+    }
+
+    constructor() {
         super({
             style_class: 'panel-section',
             layout_manager: new Clutter.BinLayout(),
             clip_to_allocation: true,
         });
 
-        this._canExpand = Boolean(canExpand);
-        this.x_expand = this._canExpand;
+        this.canExpand = false;
         this._content = null;
         this._frame = new St.Widget({
             style_class: 'panel-section-frame',
@@ -26,11 +28,7 @@ class BaseSection extends St.Widget {
         this.add_child(this._frame);
     }
 
-    get canExpand() {
-        return this._canExpand;
-    }
-
-    _setContent(content) {
+    setSectionContent(content) {
         if (this._content)
             throw new Error('A panel section can only have one content actor');
 
@@ -49,8 +47,9 @@ class BaseSection extends St.Widget {
     }
 
     destroy() {
+        this.canExpand = false;
         this._content = null;
         this._frame = null;
         super.destroy();
     }
-});
+}

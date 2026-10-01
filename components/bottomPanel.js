@@ -1,5 +1,6 @@
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
+import Meta from 'gi://Meta';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -9,7 +10,6 @@ import {DebianButton} from './debianButton.js';
 import {IndicatorSection} from './indicatorSection.js';
 import {SearchSection} from './searchSection.js';
 import {SystemSection} from './systemSection.js';
-import {WorkAreaStrut} from './workAreaStrut.js';
 
 import {
     DASH_EXPANSION_TOP_MARGIN,
@@ -20,25 +20,25 @@ import {
     PANEL_TOP_PADDING,
     SEARCH_CLEARANCE,
     SEARCH_MAX_WIDTH,
-    SEARCH_SUGGESTIONS,
     SEARCH_WIDTH_RATIO,
     SECTION_HEIGHT,
     START_SECTION_GAP,
     SYSTEM_WIDTH,
 } from '../constant.js';
 
-export const BottomPanel = GObject.registerClass(
-class BottomPanel extends St.Widget {
+export class BottomPanel extends St.Widget {
+    static {
+        GObject.registerClass(this);
+    }
+
     constructor(
         monitor,
         {
             dashApps,
             indicators,
             openStubControls,
-            overlayWindows,
             themeManager,
             transientInputManager,
-            scaleFactor = 1,
         }
     ) {
         super({
@@ -49,22 +49,21 @@ class BottomPanel extends St.Widget {
         });
 
         this._monitor = monitor;
-        this._scaleFactor = scaleFactor;
+        this._scaleFactor = Meta.is_wayland_compositor()
+            ? 1
+            : Math.max(1, monitor.geometry_scale);
 
         this._debianButton = new DebianButton(openStubControls);
         this._dashSection = new DashSection(
             dashApps,
             themeManager,
             transientInputManager,
-            scaleFactor
+            this._scaleFactor
         );
-        this._searchSection = new SearchSection(
-            SEARCH_SUGGESTIONS,
-            scaleFactor
-        );
+        this._searchSection = new SearchSection();
         this._indicatorSection = new IndicatorSection(
             indicators,
-            scaleFactor
+            this._scaleFactor
         );
         this._systemSection = new SystemSection();
 
@@ -79,20 +78,13 @@ class BottomPanel extends St.Widget {
         for (const component of this._components)
             this.add_child(component);
 
-        this._workAreaStrut = overlayWindows
-            ? null
-            : new WorkAreaStrut(
-                monitor,
-                this._scale(PANEL_HEIGHT)
-            );
+        this._updateGeometry();
 
         Main.layoutManager.addChrome(this, {
             affectsInputRegion: true,
-            affectsStruts: false,
+            affectsStruts: true,
             trackFullscreen: true,
         });
-
-        this._updateGeometry();
     }
 
     _updateGeometry() {
@@ -127,12 +119,9 @@ class BottomPanel extends St.Widget {
             monitor.height - bottomPadding -
                 this._scale(DASH_EXPANSION_TOP_MARGIN)
         );
-        this._dashSection.set_width(-1);
-        const [, dashNaturalWidth] = this._dashSection
-            .get_preferred_width(sectionHeight);
         const dashWidth = Math.min(
             dashMaxWidth,
-            Math.ceil(dashNaturalWidth)
+            this._dashSection.preferredWidth
         );
 
         this._place(
@@ -171,8 +160,6 @@ class BottomPanel extends St.Widget {
             this._scale(SYSTEM_WIDTH),
             sectionHeight
         );
-
-        this._searchSection.updatePopupPosition();
     }
 
     _scale(value) {
@@ -200,15 +187,14 @@ class BottomPanel extends St.Widget {
     }
 
     destroy() {
+        Main.layoutManager.removeChrome(this);
+
         for (const component of this._components)
             component.destroy?.();
 
-        this._workAreaStrut?.destroy();
-        this._workAreaStrut = null;
-        Main.layoutManager.removeChrome(this);
         this._monitor = null;
         this._scaleFactor = 1;
         this._components = [];
         super.destroy();
     }
-});
+}

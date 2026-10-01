@@ -14,21 +14,27 @@ import {
 } from '../constant.js';
 import {BaseSection} from './baseSection.js';
 
-export const IndicatorSection = GObject.registerClass(
-class IndicatorSection extends BaseSection {
+export class IndicatorSection extends BaseSection {
+    static {
+        GObject.registerClass(this);
+    }
+
     constructor(indicators = [], scaleFactor = 1) {
-        super({canExpand: true});
+        super();
+        this.canExpand = true;
 
         const content = new St.Widget({
             style_class: 'indicator-section',
             accessible_name: 'Indicator area',
             layout_manager: new Clutter.BinLayout(),
         });
-        this._setContent(content);
+        this.setSectionContent(content);
 
         this._indicators = [];
         this._menus = [];
         this._scaleFactor = scaleFactor;
+        this.hasIndicators = false;
+        this.preferredWidth = 0;
 
         this._indicatorBox = new St.BoxLayout({
             x_align: Clutter.ActorAlign.CENTER,
@@ -40,21 +46,15 @@ class IndicatorSection extends BaseSection {
         this.setIndicators(indicators);
     }
 
-    get hasIndicators() {
-        return this._indicators.length > 0;
-    }
-
-    get preferredWidth() {
-        if (!this.hasIndicators)
-            return 0;
-
-        return INDICATOR_MIN_WIDTH +
-            (this._indicators.length - 1) * INDICATOR_WIDTH_STEP;
-    }
-
     setIndicators(indicators) {
         this._clearIndicators();
         this._indicators = [...indicators];
+
+        this.hasIndicators = this._indicators.length > 0;
+        this.preferredWidth = this.hasIndicators
+            ? INDICATOR_MIN_WIDTH +
+                (this._indicators.length - 1) * INDICATOR_WIDTH_STEP
+            : 0;
 
         for (const indicator of this._indicators)
             this._addIndicator(indicator);
@@ -101,7 +101,9 @@ class IndicatorSection extends BaseSection {
     destroy() {
         this._clearIndicators();
         this._indicators = [];
+        this.hasIndicators = false;
+        this.preferredWidth = 0;
         this._scaleFactor = 1;
         super.destroy();
     }
-});
+}

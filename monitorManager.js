@@ -1,20 +1,17 @@
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {BottomPanel} from './components/bottomPanel.js';
-import {DisplayScale} from './displayScale.js';
 import {ThemeManager} from './themeManager.js';
 import {TransientInputManager} from './transientInputManager.js';
 
 export class MonitorManager {
-    constructor({dashApps, indicators, openStubControls, overlayWindows}) {
+    constructor({dashApps, indicators, openStubControls}) {
         this._panels = [];
         this._dashApps = dashApps;
         this._indicators = indicators;
         this._openStubControls = openStubControls;
-        this._overlayWindows = overlayWindows;
         this._themeManager = new ThemeManager();
         this._transientInputManager = new TransientInputManager();
-        this._displayScale = new DisplayScale(() => this._rebuildPanels());
         this._monitorsChangedId = Main.layoutManager.connect(
             'monitors-changed',
             () => this._rebuildPanels()
@@ -31,10 +28,8 @@ export class MonitorManager {
                 dashApps: this._dashApps,
                 indicators: this._indicators,
                 openStubControls: this._openStubControls,
-                overlayWindows: this._overlayWindows,
                 themeManager: this._themeManager,
                 transientInputManager: this._transientInputManager,
-                scaleFactor: this._displayScale.factor,
             });
             this._themeManager.addActor(panel);
             this._panels.push(panel);
@@ -55,14 +50,6 @@ export class MonitorManager {
             panel.setIndicators(indicators);
     }
 
-    setOverlayWindows(overlayWindows) {
-        if (this._overlayWindows === overlayWindows)
-            return;
-
-        this._overlayWindows = overlayWindows;
-        this._rebuildPanels();
-    }
-
     _destroyPanels() {
         for (const panel of this._panels) {
             this._themeManager.removeActor(panel);
@@ -79,8 +66,6 @@ export class MonitorManager {
         }
 
         this._destroyPanels();
-        this._displayScale.destroy();
-        this._displayScale = null;
         this._transientInputManager.destroy();
         this._transientInputManager = null;
         this._themeManager.destroy();
@@ -88,6 +73,5 @@ export class MonitorManager {
         this._dashApps = null;
         this._indicators = null;
         this._openStubControls = null;
-        this._overlayWindows = null;
     }
 }

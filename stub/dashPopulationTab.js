@@ -3,10 +3,14 @@ import GObject from 'gi://GObject';
 import St from 'gi://St';
 
 export const MIN_DASH_ITEMS = 3;
+export const DEFAULT_DASH_ITEMS = 5;
 export const MAX_DASH_ITEMS = 100;
 
-export const DashPopulationTab = GObject.registerClass(
-class DashPopulationTab extends St.BoxLayout {
+export class DashPopulationTab extends St.BoxLayout {
+    static {
+        GObject.registerClass(this);
+    }
+
     constructor(initialCount) {
         super({
             vertical: true,
@@ -80,4 +84,4 @@ class DashPopulationTab extends St.BoxLayout {
         this._increaseButton.disconnect(this._increaseId);
         super.destroy();
     }
-});
+}

@@ -4,8 +4,8 @@ import St from 'gi://St';
 import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
 
 import {
+    DEFAULT_DASH_ITEMS,
     DashPopulationTab,
-    MIN_DASH_ITEMS,
 } from './dashPopulationTab.js';
 import {
     IndicatorPopulationTab,
@@ -16,8 +16,10 @@ import {createMockIndicators} from './mockIndicators.js';
 
 export class StubController {
     constructor({onDashAppsChanged, onIndicatorsChanged}) {
-        this._dashItemCount = MIN_DASH_ITEMS;
+        this._dashItemCount = DEFAULT_DASH_ITEMS;
         this._indicatorCount = MIN_INDICATORS;
+        this.dashApps = createMockDashApps(this._dashItemCount);
+        this.indicators = createMockIndicators(this._indicatorCount);
         this._onDashAppsChanged = onDashAppsChanged;
         this._onIndicatorsChanged = onIndicatorsChanged;
         this._dialog = null;
@@ -25,14 +27,6 @@ export class StubController {
         this._indicatorPopulationTab = null;
         this._tabContent = null;
         this._tabButtons = new Map();
-    }
-
-    get dashApps() {
-        return createMockDashApps(this._dashItemCount);
-    }
-
-    get indicators() {
-        return createMockIndicators(this._indicatorCount);
     }
 
     open() {
@@ -116,6 +110,8 @@ export class StubController {
     _applyStubValues() {
         this._dashItemCount = this._dashPopulationTab.getCount();
         this._indicatorCount = this._indicatorPopulationTab.getCount();
+        this.dashApps = createMockDashApps(this._dashItemCount);
+        this.indicators = createMockIndicators(this._indicatorCount);
         this._dashPopulationTab.setCount(this._dashItemCount);
         this._indicatorPopulationTab.setCount(this._indicatorCount);
         this._onDashAppsChanged(this.dashApps);
@@ -133,6 +129,8 @@ export class StubController {
 
         this._dialog?.destroy();
         this._dialog = null;
+        this.dashApps = null;
+        this.indicators = null;
         this._onDashAppsChanged = null;
         this._onIndicatorsChanged = null;
     }

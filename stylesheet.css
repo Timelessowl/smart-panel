@@ -36,6 +36,16 @@
     padding: 16px;
 }
 
+.debian-popup-menu .popup-menu-content {
+    min-width: 0;
+    padding: 6px;
+}
+
+.debian-menu-icon-item {
+    border-radius: 8px;
+    padding: 8px;
+}
+
 .bottom-panel-surface.dark .dash-app-button:hover,
 .bottom-panel-surface.dark .system-section-button:hover,
 .bottom-panel-surface.dark .indicator-button:hover {
@@ -176,24 +186,6 @@
 .bottom-panel-surface.light .search-layout-button:focus,
 .bottom-panel-surface.light .search-layout-button:active {
     background-color: rgb(226, 226, 230);
-}
-
-.search-suggestions {
-    background-color: rgb(36, 36, 40);
-    border: 1px solid rgb(72, 72, 78);
-    border-radius: 14px;
-    box-shadow: none;
-    padding: 6px;
-}
-
-.search-suggestion-button {
-    border-radius: 9px;
-    padding: 8px 12px;
-    text-align: left;
-}
-
-.search-suggestion-button:hover {
-    background-color: rgb(56, 56, 62);
 }
 
 .indicator-button {

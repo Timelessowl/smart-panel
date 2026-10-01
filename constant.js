@@ -24,15 +24,6 @@ export const INDICATOR_ITEM_SIZE = 26;
 export const INDICATOR_ITEM_SPACING = 6;
 export const INDICATOR_ICON_SIZE = 16;
 
-export const SEARCH_SUGGESTIONS = [
-    'Files',
-    'Firefox',
-    'Settings',
-    'Terminal',
-];
-
-export const MAX_VISIBLE_SUGGESTIONS = 4;
-
 export const DASH_ITEM_SIZE = 48;
 export const DASH_ITEM_SPACING = 4;
 export const DASH_PADDING = 6;

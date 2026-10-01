@@ -1,3 +1,4 @@
+import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
@@ -7,10 +8,13 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 import {BaseSection} from './baseSection.js';
 
-export const DebianButton = GObject.registerClass(
-class DebianButton extends BaseSection {
+export class DebianButton extends BaseSection {
+    static {
+        GObject.registerClass(this);
+    }
+
     constructor(openStubControls) {
-        super({canExpand: false});
+        super();
 
         const debianIcon = Gio.ThemedIcon.new_from_names([
             'distributor-logo-debian',
@@ -26,7 +30,7 @@ class DebianButton extends BaseSection {
                 icon_size: 30,
             }),
         });
-        this._setContent(button);
+        this.setSectionContent(button);
         this._button = button;
 
         this._menu = new PopupMenu.PopupMenu(this._button, 0.5, St.Side.BOTTOM);
@@ -34,20 +38,69 @@ class DebianButton extends BaseSection {
         Main.layoutManager.uiGroup.add_child(this._menu.actor);
         this._menu.actor.hide();
 
-        const notificationItem = new PopupMenu.PopupMenuItem('Show notification');
-        notificationItem.connect('activate', () => {
-            Main.notify('Simple Bottom Panel', 'Hello from the Debian menu.');
-        });
-        this._menu.addMenuItem(notificationItem);
+        const launchers = [
+            {
+                iconName: 'avatar-default-symbolic',
+                accessibleName: 'User',
+                action: () => Main.notify(
+                    'User',
+                    'The user launcher will be connected here.'
+                ),
+            },
+            {
+                iconName: 'document-open-recent-symbolic',
+                accessibleName: 'Recent items',
+                action: () => Main.notify(
+                    'Recent items',
+                    'The recent-items launcher will be connected here.'
+                ),
+            },
+            {
+                iconName: 'preferences-system-symbolic',
+                accessibleName: 'Settings',
+                action: () => Main.notify(
+                    'Settings',
+                    'The settings launcher will be connected here.'
+                ),
+            },
+            {
+                iconName: 'system-shutdown-symbolic',
+                accessibleName: 'Power',
+                action: () => Main.notify(
+                    'Power',
+                    'The power launcher will be connected here.'
+                ),
+            },
+        ];
 
-        const stubControlsItem = new PopupMenu.PopupMenuItem('Open stub controls');
-        stubControlsItem.connect('activate', () => openStubControls());
-        this._menu.addMenuItem(stubControlsItem);
+        for (const launcher of launchers)
+            this._addIconLauncher(launcher);
+
+        this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        this._addIconLauncher({
+            iconName: 'view-app-grid-symbolic',
+            accessibleName: 'Open stub controls',
+            action: () => openStubControls(),
+        });
 
         this._clickedId = this._button.connect(
             'clicked',
             () => this._menu.toggle()
         );
+    }
+
+    _addIconLauncher({iconName, accessibleName, action}) {
+        const item = new PopupMenu.PopupBaseMenuItem();
+        item.add_style_class_name('debian-menu-icon-item');
+        item.accessible_name = accessibleName;
+        item.add_child(new St.Icon({
+            icon_name: iconName,
+            icon_size: 20,
+            x_expand: true,
+            x_align: Clutter.ActorAlign.CENTER,
+        }));
+        item.connect('activate', action);
+        this._menu.addMenuItem(item);
     }
 
     destroy() {
@@ -58,4 +111,4 @@ class DebianButton extends BaseSection {
         this._button = null;
         super.destroy();
     }
-});
+}
