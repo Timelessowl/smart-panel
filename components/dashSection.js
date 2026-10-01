@@ -9,7 +9,7 @@ import {
     DASH_ITEM_SIZE,
     DASH_ITEM_SPACING,
     DASH_PADDING,
-    PANEL_HEIGHT,
+    SECTION_HEIGHT,
 } from '../constant.js';
 import {BaseSection} from './baseSection.js';
 
@@ -38,7 +38,7 @@ class DashSection extends BaseSection {
         this._apps = [];
         this._availableWidth = 0;
         this._scaleFactor = scaleFactor;
-        this._maxExpansionHeight = this._scale(PANEL_HEIGHT);
+        this._maxExpansionHeight = this._scale(SECTION_HEIGHT);
         this._expandedSurface = null;
         this._dismissRegistration = null;
         this._dash = dash;
@@ -64,7 +64,7 @@ class DashSection extends BaseSection {
         this._closeExpanded();
         this._availableWidth = width;
         this._maxExpansionHeight = Math.max(
-            this._scale(PANEL_HEIGHT),
+            this._scale(SECTION_HEIGHT),
             maxExpansionHeight
         );
         this._rebuildCollapsed();

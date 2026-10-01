@@ -1,10 +1,12 @@
 // Layout values are kept here so the panel can be reshaped without touching
 // component implementation files.
 
-export const PANEL_HEIGHT = 64;
-export const PANEL_SIDE_MARGIN = 10;
-export const PANEL_BOTTOM_MARGIN = 20;
-export const PANEL_TOP_MARGIN = PANEL_BOTTOM_MARGIN;
+export const SECTION_HEIGHT = 64;
+export const PANEL_HORIZONTAL_PADDING = 10;
+export const PANEL_TOP_PADDING = 20;
+export const PANEL_BOTTOM_PADDING = 20;
+export const PANEL_HEIGHT = SECTION_HEIGHT +
+    PANEL_TOP_PADDING + PANEL_BOTTOM_PADDING;
 
 export const SECTION_FRAME_WIDTH = 10;
 
@@ -16,7 +18,7 @@ export const SEARCH_MAX_WIDTH = 360;
 export const SEARCH_WIDTH_RATIO = 0.28;
 export const SYSTEM_WIDTH = 176;
 
-export const INDICATOR_MIN_WIDTH = PANEL_HEIGHT;
+export const INDICATOR_MIN_WIDTH = SECTION_HEIGHT;
 export const INDICATOR_WIDTH_STEP = 32;
 export const INDICATOR_ITEM_SIZE = 26;
 export const INDICATOR_ITEM_SPACING = 6;

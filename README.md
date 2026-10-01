@@ -10,8 +10,10 @@ the bottom of every connected monitor:
 5. Date and quick-settings placeholders.
 
 The transparent space between pieces remains part of the panel's input area.
-Layout values, edge margins, gaps, widths, and search suggestions can all be
-changed in `constant.js`.
+Layout values, panel padding, gaps, widths, and search suggestions can all be
+changed in `constant.js`. `PANEL_HEIGHT` is derived from `SECTION_HEIGHT` plus
+the top and bottom padding. Horizontal padding also stays inside the full-width
+panel actor, so visual outer spacing never becomes a pass-through gap.
 
 All five section classes derive from the GObject-registered `BaseSection`, which
 is itself an `St.Widget`. Registered actors use standard JavaScript constructors
@@ -61,7 +63,7 @@ stop above it. Open the extension preferences and enable **Allow windows behind
 the panel** to restore overlay behavior where windows can extend beneath it.
 The reservation is handled by a transparent, non-interactive strip attached to
 the bottom edge; the visible floating pieces keep their inset layout. The
-reserved work area leaves matching gaps above and below the visible panel.
+reserved work area includes the panel's top and bottom padding.
 
 ```sh
 gnome-extensions prefs simple-bottom-panel@local
