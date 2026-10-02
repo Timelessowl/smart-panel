@@ -1,6 +1,8 @@
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
+import Shell from 'gi://Shell';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 const POINTER_POLL_INTERVAL = 16;
 const POINTER_BUTTON_MASK =
@@ -20,8 +22,8 @@ export class TransientInputManager {
         this._acceleratorActivatedId = 0;
     }
 
-    register(actor, dismiss) {
-        const registration = {actor, dismiss};
+    register(actor, dismiss, relatedActors = new Set()) {
+        const registration = {actor, dismiss, relatedActors, paused: false};
         this._registrations.add(registration);
 
         if (this._registrations.size === 1)
@@ -55,6 +57,9 @@ export class TransientInputManager {
         if (this._escapeActionId === Meta.KeyBindingAction.NONE)
             return;
 
+        const binding = Meta.external_binding_name_for_action(this._escapeActionId);
+        Main.wm.allowKeybinding(binding, Shell.ActionMode.NORMAL | Shell.ActionMode.POPUP);
+
         this._acceleratorActivatedId = global.display.connect(
             'accelerator-activated',
             (_display, actionId) => {
@@ -87,11 +92,15 @@ export class TransientInputManager {
 
     _dismissOutside(x, y) {
         for (const registration of [...this._registrations]) {
-            const {actor, dismiss} = registration;
-            const [actorX, actorY] = actor.get_transformed_position();
-            const [width, height] = actor.get_transformed_size();
-            const isInside = x >= actorX && x < actorX + width &&
-                y >= actorY && y < actorY + height;
+            const {actor, dismiss, relatedActors, paused} = registration;
+            if (paused)
+                continue;
+            const isInside = [actor, ...relatedActors].some(surface => {
+                const [actorX, actorY] = surface.get_transformed_position();
+                const [width, height] = surface.get_transformed_size();
+                return x >= actorX && x < actorX + width &&
+                    y >= actorY && y < actorY + height;
+            });
 
             if (!isInside)
                 dismiss();
@@ -115,6 +124,8 @@ export class TransientInputManager {
         }
 
         if (this._escapeActionId !== Meta.KeyBindingAction.NONE) {
+            const binding = Meta.external_binding_name_for_action(this._escapeActionId);
+            Main.wm.allowKeybinding(binding, Shell.ActionMode.NONE);
             global.display.ungrab_accelerator(this._escapeActionId);
             this._escapeActionId = 0;
         }

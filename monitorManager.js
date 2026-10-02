@@ -5,17 +5,21 @@ import {ThemeManager} from './themeManager.js';
 import {TransientInputManager} from './transientInputManager.js';
 
 export class MonitorManager {
-    constructor({dashApps, indicators, openStubControls}) {
+    constructor({dashSource, indicators, openPreferences}) {
         this._panels = [];
-        this._dashApps = dashApps;
+        this._dashSource = dashSource;
         this._indicators = indicators;
-        this._openStubControls = openStubControls;
+        this._openPreferences = openPreferences;
         this._themeManager = new ThemeManager();
         this._transientInputManager = new TransientInputManager();
         this._monitorsChangedId = Main.layoutManager.connect(
             'monitors-changed',
             () => this._rebuildPanels()
         );
+        this._unsubscribeDash = dashSource.subscribe(() => {
+            for (const panel of this._panels)
+                panel.refreshDash();
+        });
 
         this._rebuildPanels();
     }
@@ -25,22 +29,15 @@ export class MonitorManager {
 
         for (const monitor of Main.layoutManager.monitors) {
             const panel = new BottomPanel(monitor, {
-                dashApps: this._dashApps,
+                dashSource: this._dashSource,
                 indicators: this._indicators,
-                openStubControls: this._openStubControls,
+                openPreferences: this._openPreferences,
                 themeManager: this._themeManager,
                 transientInputManager: this._transientInputManager,
             });
             this._themeManager.addActor(panel);
             this._panels.push(panel);
         }
-    }
-
-    setDashApps(dashApps) {
-        this._dashApps = dashApps;
-
-        for (const panel of this._panels)
-            panel.setDashApps(dashApps);
     }
 
     setIndicators(indicators) {
@@ -60,6 +57,7 @@ export class MonitorManager {
     }
 
     destroy() {
+        this._unsubscribeDash();
         if (this._monitorsChangedId) {
             Main.layoutManager.disconnect(this._monitorsChangedId);
             this._monitorsChangedId = 0;
@@ -70,8 +68,8 @@ export class MonitorManager {
         this._transientInputManager = null;
         this._themeManager.destroy();
         this._themeManager = null;
-        this._dashApps = null;
+        this._dashSource = null;
         this._indicators = null;
-        this._openStubControls = null;
+        this._openPreferences = null;
     }
 }

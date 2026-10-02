@@ -1,5 +1,6 @@
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
+import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import {SECTION_FRAME_WIDTH} from '../constant.js';
@@ -25,6 +26,8 @@ export class BaseSection extends St.Widget {
             x_expand: true,
             y_expand: true,
         });
+        // DND uses PickMode.ALL, which includes non-reactive decorations.
+        Shell.util_set_hidden_from_pick(this._frame, true);
         this.add_child(this._frame);
     }
 

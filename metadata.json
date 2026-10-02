@@ -3,5 +3,6 @@
   "name": "Simple Bottom Panel",
   "description": "A configurable bottom panel for every monitor.",
   "version": 1,
-  "shell-version": ["48"]
+  "shell-version": ["48"],
+  "settings-schema": "org.gnome.shell.extensions.simple-bottom-panel"
 }

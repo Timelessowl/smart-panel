@@ -1,0 +1,34 @@
+schema: spec-driven
+
+context: |
+  Simple Bottom Panel is a GNOME Shell 48.7 extension implemented in plain GJS
+  ES modules, St, Clutter, and GObject. No bundler or runtime Node dependency.
+  UUID: simple-bottom-panel@local. Install with install.sh into the standard
+  per-user GNOME Shell extensions directory; compile the GSettings schema only.
+  One independent bottom panel is created for each discovered monitor.
+  Wayland uses native scaling; X11 geometry uses the monitor geometry_scale.
+  BaseSection owns the shared solid surface/frame; BottomPanel owns geometry.
+  The master contract is openspec/specs/panel-shell/spec.md. Feature contracts
+  are debian-menu, dash-section, indicator-section, and system-section.
+  Search is deliberately excluded from feature specification at this stage.
+  Specifications capture approved behavior, not a claim of runtime verification.
+  Preserve existing user changes. Do not use the VM unless the user authorizes it.
+  Development tests: npm ci, then npm test (Jasmine suites with GJS API doubles).
+  Shell updates require a real restart: Alt+F2 then r on X11, logout/login on
+  Wayland. Disable/enable is not sufficient to validate changed module code.
+
+rules:
+  proposal:
+    - Keep behavior changes separate from implementation-only alignment and verification.
+    - Do not introduce search logic, restored stubs, or live indicator/system integrations.
+  specs:
+    - Write in English; use SHALL or MUST and explicit WHEN/THEN scenarios.
+    - Keep requirements behavioral; place class names and algorithms in design.md.
+    - Preserve the clarified dash semantics in the existing feature contract.
+  design:
+    - Use registered actor subclasses with constructors and ordinary properties.
+    - Keep panel geometry in one place and shared wrapping in BaseSection.
+    - Distinguish existing implementation, known gaps, and unverified native behavior.
+  tasks:
+    - Use numbered checkbox tasks with an explicit completion check.
+    - Do not mark native Shell acceptance complete based only on API-double tests.

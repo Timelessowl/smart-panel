@@ -13,7 +13,7 @@ export class DebianButton extends BaseSection {
         GObject.registerClass(this);
     }
 
-    constructor(openStubControls) {
+    constructor(openPreferences) {
         super();
 
         const debianIcon = Gio.ThemedIcon.new_from_names([
@@ -79,8 +79,8 @@ export class DebianButton extends BaseSection {
         this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         this._addIconLauncher({
             iconName: 'view-app-grid-symbolic',
-            accessibleName: 'Open stub controls',
-            action: () => openStubControls(),
+            accessibleName: 'Dash preferences',
+            action: () => openPreferences(),
         });
 
         this._clickedId = this._button.connect(

@@ -34,9 +34,9 @@ export class BottomPanel extends St.Widget {
     constructor(
         monitor,
         {
-            dashApps,
+            dashSource,
             indicators,
-            openStubControls,
+            openPreferences,
             themeManager,
             transientInputManager,
         }
@@ -53,13 +53,15 @@ export class BottomPanel extends St.Widget {
             ? 1
             : Math.max(1, monitor.geometry_scale);
 
-        this._debianButton = new DebianButton(openStubControls);
+        this._debianButton = new DebianButton(openPreferences);
         this._dashSection = new DashSection(
-            dashApps,
+            dashSource,
+            monitor.index,
             themeManager,
             transientInputManager,
             this._scaleFactor
         );
+        this._dashSection.onOrderChanged = () => this.refreshDash();
         this._searchSection = new SearchSection();
         this._indicatorSection = new IndicatorSection(
             indicators,
@@ -176,8 +178,8 @@ export class BottomPanel extends St.Widget {
         this._place(section, x, y, width, height);
     }
 
-    setDashApps(dashApps) {
-        this._dashSection.setApps(dashApps);
+    refreshDash() {
+        this._dashSection.refresh();
         this._updateGeometry();
     }
 

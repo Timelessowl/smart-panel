@@ -1,0 +1,11 @@
+{
+  "name": "simple-bottom-panel",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-vm-modules ./node_modules/jasmine/bin/jasmine.js --config=tests/support/jasmine.mjs"
+  },
+  "devDependencies": {
+    "jasmine": "7.0.0"
+  }
+}

@@ -76,13 +76,13 @@
     box-shadow: none;
 }
 
-.bottom-panel-surface.dark .dash-placeholder,
+.bottom-panel-surface.dark .dash-section,
 .bottom-panel-surface.dark .indicator-section,
 .bottom-panel-surface.dark .system-section {
     color: rgb(255, 255, 255);
 }
 
-.bottom-panel-surface.light .dash-placeholder,
+.bottom-panel-surface.light .dash-section,
 .bottom-panel-surface.light .indicator-section,
 .bottom-panel-surface.light .system-section {
     color: rgb(36, 36, 40);
@@ -91,6 +91,51 @@
 .dash-app-button {
     border-radius: 11px;
     font-weight: 600;
+    padding: 0;
+}
+
+.dash-window-dots {
+    spacing: 2px;
+}
+
+.dash-window-dot {
+    width: 2px;
+    height: 2px;
+    border-radius: 1px;
+}
+
+.bottom-panel-surface.dark .dash-window-dot,
+.dash-expanded.dark .dash-window-dot {
+    background-color: white;
+}
+
+.bottom-panel-surface.light .dash-window-dot,
+.dash-expanded.light .dash-window-dot {
+    background-color: rgb(36, 36, 40);
+}
+
+.bottom-panel-surface.dark .dash-running-separator,
+.dash-expanded.dark .dash-running-separator {
+    background-color: rgb(100, 100, 108);
+}
+
+.bottom-panel-surface.light .dash-running-separator,
+.dash-expanded.light .dash-running-separator {
+    background-color: rgb(172, 172, 180);
+}
+
+.dash-drop-preview {
+    background-color: transparent;
+    border: none;
+    padding: 0;
+}
+
+.dash-drop-preview.dark {
+    color: white;
+}
+
+.dash-drop-preview.light {
+    color: rgb(36, 36, 40);
 }
 
 .bottom-panel-surface.dark .dash-overflow-button {
@@ -102,15 +147,29 @@
 }
 
 .dash-expanded.dark {
-    background-color: rgb(36, 36, 40);
-    border-color: rgb(72, 72, 78);
     color: white;
 }
 
+.dash-expanded.dark .panel-piece {
+    background-color: rgb(36, 36, 40);
+    border-color: rgb(72, 72, 78);
+}
+
 .dash-expanded.light {
+    color: rgb(36, 36, 40);
+}
+
+.dash-expanded.light .panel-piece {
     background-color: rgb(246, 245, 244);
     border-color: rgb(198, 198, 203);
-    color: rgb(36, 36, 40);
+}
+
+.dash-expanded.dark .panel-section-frame {
+    border-color: rgb(44, 44, 50);
+}
+
+.dash-expanded.light .panel-section-frame {
+    border-color: rgb(220, 220, 225);
 }
 
 .dash-expanded.dark .dash-app-button:hover {
@@ -204,53 +263,4 @@
 
 .date-button {
     font-weight: 600;
-}
-
-.stub-dialog-title {
-    font-size: 18px;
-    font-weight: bold;
-    margin-bottom: 14px;
-}
-
-.stub-tab-bar {
-    margin-bottom: 14px;
-}
-
-.stub-tab-button {
-    border-radius: 9px;
-    padding: 8px 12px;
-}
-
-.stub-tab-button.selected {
-    background-color: rgb(72, 72, 78);
-}
-
-.stub-tab-content {
-    spacing: 12px;
-    min-width: 320px;
-}
-
-.stub-field-label {
-    font-weight: 600;
-}
-
-.stub-number-controls {
-    spacing: 10px;
-}
-
-.stub-number-button {
-    border-radius: 9px;
-    padding: 8px 14px;
-    font-size: 18px;
-}
-
-.stub-number-entry {
-    width: 80px;
-    padding: 8px;
-    text-align: center;
-}
-
-.stub-field-help {
-    color: rgb(164, 164, 170);
-    font-size: 12px;
 }

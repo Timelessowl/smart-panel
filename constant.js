@@ -24,8 +24,13 @@ export const INDICATOR_ITEM_SIZE = 26;
 export const INDICATOR_ITEM_SPACING = 6;
 export const INDICATOR_ICON_SIZE = 16;
 
-export const DASH_ITEM_SIZE = 48;
+export const DASH_ICON_SIZE = 40;
+export const DASH_SMALL_ICON_SIZE = 32;
+export const DASH_ITEM_INSET = 8;
+export const DASH_SEPARATOR_WIDTH = 8;
 export const DASH_ITEM_SPACING = 4;
 export const DASH_PADDING = 6;
 export const DASH_BORDER_WIDTH = 1;
 export const DASH_EXPANSION_TOP_MARGIN = 10;
+export const DASH_DROP_PREVIEW_SIZE = 16;
+export const DASH_DROP_PREVIEW_OPACITY = 96;
