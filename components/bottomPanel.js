@@ -21,6 +21,8 @@ import {
     SEARCH_CLEARANCE,
     SEARCH_MAX_WIDTH,
     SEARCH_WIDTH_RATIO,
+    SECTION_BORDER_WIDTH,
+    SECTION_FRAME_WIDTH,
     SECTION_HEIGHT,
     START_SECTION_GAP,
     SYSTEM_WIDTH,
@@ -92,7 +94,8 @@ export class BottomPanel extends St.Widget {
     _updateGeometry() {
         const monitor = this._monitor;
         const panelHeight = this._scale(PANEL_HEIGHT);
-        const sectionHeight = this._scale(SECTION_HEIGHT);
+        const sectionHeight = this._scale(SECTION_HEIGHT +
+            (SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH) * 2);
         const horizontalPadding = this._scale(PANEL_HORIZONTAL_PADDING);
         const topPadding = this._scale(PANEL_TOP_PADDING);
         const bottomPadding = this._scale(PANEL_BOTTOM_PADDING);

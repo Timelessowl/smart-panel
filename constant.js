@@ -1,14 +1,16 @@
 // Layout values are kept here so the panel can be reshaped without touching
 // component implementation files.
 
+// Content height excludes the translucent frame padding and solid outline.
 export const SECTION_HEIGHT = 64;
+export const SECTION_FRAME_WIDTH = 8;
+export const SECTION_BORDER_WIDTH = 1;
 export const PANEL_HORIZONTAL_PADDING = 10;
 export const PANEL_TOP_PADDING = 20;
 export const PANEL_BOTTOM_PADDING = 20;
 export const PANEL_HEIGHT = SECTION_HEIGHT +
+    (SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH) * 2 +
     PANEL_TOP_PADDING + PANEL_BOTTOM_PADDING;
-
-export const SECTION_FRAME_WIDTH = 10;
 
 export const START_SECTION_GAP = 6;
 export const END_SECTION_GAP = 12;
@@ -18,7 +20,8 @@ export const SEARCH_MAX_WIDTH = 360;
 export const SEARCH_WIDTH_RATIO = 0.28;
 export const SYSTEM_WIDTH = 176;
 
-export const INDICATOR_MIN_WIDTH = SECTION_HEIGHT;
+export const INDICATOR_MIN_WIDTH = SECTION_HEIGHT +
+    (SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH) * 2;
 export const INDICATOR_WIDTH_STEP = 32;
 export const INDICATOR_ITEM_SIZE = 26;
 export const INDICATOR_ITEM_SPACING = 6;

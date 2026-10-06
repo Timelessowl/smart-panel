@@ -10,7 +10,7 @@ and recreate panels. Shared observer state is separate from per-panel views.
 
 ## Goals / Non-Goals
 
-Goals: preserve a single geometry authority, consistent solid section framing,
+Goals: preserve a single geometry authority, consistent framed opaque surfaces,
 dynamic monitor coverage, compositor-aware scaling, and deterministic cleanup.
 
 Non-goals: new runtime dependencies, a separate strut/frame/scale manager,
@@ -30,11 +30,19 @@ For indicators this means content-dependent width, not an expanded popup.
 
 ### One shared frame implementation
 
-`BaseSection.setSectionContent()` installs one content actor under one decorative
-frame actor, with clipping inside the section allocation. The frame's thickness
-comes from `SECTION_FRAME_WIDTH`; styling is centralized in `stylesheet.css`.
-Frame actors are excluded from picking via `Shell.util_set_hidden_from_pick()`.
-This preserves drag-target reachability even when Shell picks non-reactive actors.
+BaseSection has a transparent background and owns an St.Bin frame whose child
+is the opaque section content. The frame's native 8px padding exposes its
+40%-alpha background; its separate 1px opaque CSS outline is white in dark theme
+and black in light theme. Native St allocation, St.Bin and Clutter.BinLayout handle
+border and padding without custom allocation or manual paint clipping. The frame
+is a parent container, not an overlay. Band and outline thickness come from
+`SECTION_FRAME_WIDTH` and `SECTION_BORDER_WIDTH`; palette colors live in `stylesheet.css`.
+BottomPanel still owns outer section geometry. Control padding
+and dash row height fit inside the native border without resizing icons or
+counting the inset twice. During expansion the collapsed frame and content are
+hidden, leaving root bounds and drop delegates intact. The frame is not hidden
+from picking, because that would hide its descendants too; picks reach controls
+or traverse from the frame to the section root's drop delegate.
 Per-section duplicated borders and an external wrapping manager are rejected.
 
 ### BottomPanel owns geometry and reservation
@@ -42,7 +50,11 @@ Per-section duplicated borders and an external wrapping manager are rejected.
 `BottomPanel._updateGeometry()` calculates all positions and outer sizes.
 Sections provide content-derived preferred widths but do not resize the panel
 or infer monitor/search bounds. Panel height is
-`SECTION_HEIGHT + PANEL_TOP_PADDING + PANEL_BOTTOM_PADDING`.
+`SECTION_HEIGHT + 2 * (SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH) + PANEL_TOP_PADDING + PANEL_BOTTOM_PADDING`.
+BottomPanel calculates section bounds directly from content height, band and outline;
+there is no separate outer-height constant for sections to import.
+`SECTION_HEIGHT` describes only content height. The square Debian button and
+minimum indicator width use the outer height, including both border edges.
 Horizontal padding and transparent gaps are inside the reactive panel actor.
 The panel itself is registered through `Main.layoutManager.addChrome()` with
 `affectsStruts: true`; there is no independent strut actor or overlay toggle.
@@ -63,8 +75,8 @@ Native mixed-scale X11 behavior still requires acceptance checks.
 `.dark` only for `prefer-dark`, otherwise `.light`. It styles panels, expanded
 dash surfaces, and drag previews. Native popup-menu chrome follows Shell's own
 menu styling; this design does not recolor Shell's top-panel menus.
-Filled pieces/frame borders are opaque; only unfilled panel space and the
-explicit drag ghost are transparent. `TransientInputManager` handles expanded
+Filled surfaces are opaque; frame borders, unfilled panel space, and the
+explicit drag ghost allow transparency. `TransientInputManager` handles expanded
 dash dismissal without a stage-wide input grab. Popup ownership stays with the
 feature that created it.
 
@@ -80,8 +92,8 @@ extension. Documentation validation tooling also remains outside the runtime.
 
 - Full rebuild on monitor changes resets local drag order and expansion → this
   is current behavior; orders are deliberately not persisted.
-- Thin decorators can mask drag targets → keep decorations hidden from pick and
-  test section-root drop fallbacks.
+- Native borders pick the section root rather than a control → test section-root
+  drop fallbacks as well as icon targets.
 - Source-level scaling checks cannot establish actual device output → keep
   X11/Wayland and multi-monitor native acceptance unchecked.
 - Pointer polling can miss a press shorter than its polling interval → include

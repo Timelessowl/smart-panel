@@ -1,8 +1,10 @@
-.bottom-panel-surface {
+.bottom-panel-surface,
+.panel-section {
     background-color: transparent;
 }
 
 .panel-piece {
+    background-color: transparent;
     border: 1px solid transparent;
     border-radius: 16px;
 }
@@ -13,27 +15,33 @@
     border-radius: 16px;
 }
 
-.bottom-panel-surface.dark .panel-piece {
+.bottom-panel-surface.dark .panel-piece,
+.dash-expanded.dark .panel-piece {
     background-color: rgb(36, 36, 40);
     border-color: rgb(72, 72, 78);
 }
 
-.bottom-panel-surface.light .panel-piece {
+.bottom-panel-surface.light .panel-piece,
+.dash-expanded.light .panel-piece {
     background-color: rgb(246, 245, 244);
     border-color: rgb(198, 198, 203);
 }
 
-.bottom-panel-surface.dark .panel-section-frame {
-    border-color: rgb(44, 44, 50);
+.bottom-panel-surface.dark .panel-section-frame,
+.dash-expanded.dark .panel-section-frame {
+    background-color: rgba(44, 44, 50, 0.4);
+    border-color: white;
 }
 
-.bottom-panel-surface.light .panel-section-frame {
-    border-color: rgb(220, 220, 225);
+.bottom-panel-surface.light .panel-section-frame,
+.dash-expanded.light .panel-section-frame {
+    background-color: rgba(220, 220, 225, 0.4);
+    border-color: black;
 }
 
 .debian-button {
     color: #d70a53;
-    padding: 16px;
+    padding: 0;
 }
 
 .debian-popup-menu .popup-menu-content {
@@ -150,26 +158,8 @@
     color: white;
 }
 
-.dash-expanded.dark .panel-piece {
-    background-color: rgb(36, 36, 40);
-    border-color: rgb(72, 72, 78);
-}
-
 .dash-expanded.light {
     color: rgb(36, 36, 40);
-}
-
-.dash-expanded.light .panel-piece {
-    background-color: rgb(246, 245, 244);
-    border-color: rgb(198, 198, 203);
-}
-
-.dash-expanded.dark .panel-section-frame {
-    border-color: rgb(44, 44, 50);
-}
-
-.dash-expanded.light .panel-section-frame {
-    border-color: rgb(220, 220, 225);
 }
 
 .dash-expanded.dark .dash-app-button:hover {
@@ -181,7 +171,7 @@
 }
 
 .search-section {
-    padding: 0 16px;
+    padding: 0 8px;
     spacing: 10px;
 }
 
@@ -252,7 +242,7 @@
 }
 
 .system-section {
-    padding: 6px;
+    padding: 0 6px;
     spacing: 4px;
 }
 

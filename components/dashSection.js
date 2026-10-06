@@ -8,7 +8,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {
     DASH_BORDER_WIDTH, DASH_ICON_SIZE, DASH_ITEM_INSET, DASH_ITEM_SPACING,
-    DASH_PADDING, SECTION_FRAME_WIDTH, SECTION_HEIGHT,
+    DASH_PADDING, SECTION_BORDER_WIDTH, SECTION_FRAME_WIDTH, SECTION_HEIGHT,
     DASH_DROP_PREVIEW_SIZE, DASH_DROP_PREVIEW_OPACITY,
 } from '../constant.js';
 import {BaseSection} from './baseSection.js';
@@ -16,7 +16,11 @@ import {DashIcon} from './dash/dashIcon.js';
 import {expandedRows, layoutDash, tokensWidth} from './dash/dashLayout.js';
 import {nextAppAction} from './dash/appActivation.js';
 
-const CONTENT_INSET = Math.max(DASH_PADDING, SECTION_FRAME_WIDTH);
+// The native frame already provides the outer inset. Only add any
+// requested dash padding that extends beyond it, rather than counting it twice.
+const CONTENT_PADDING = Math.max(0, DASH_PADDING - SECTION_FRAME_WIDTH);
+const CONTENT_INSET = SECTION_BORDER_WIDTH + SECTION_FRAME_WIDTH +
+    CONTENT_PADDING + DASH_BORDER_WIDTH;
 
 export class DashSection extends BaseSection {
     static {
@@ -59,7 +63,7 @@ export class DashSection extends BaseSection {
             },
         };
         this._dash = new St.BoxLayout({style_class: 'dash-section',
-            style: `padding: 0 ${CONTENT_INSET}px; spacing: ${DASH_ITEM_SPACING}px;`});
+            style: `padding: 0 ${CONTENT_PADDING}px; spacing: ${DASH_ITEM_SPACING}px;`});
         this.setSectionContent(this._dash);
         this.refresh();
         DND.addDragMonitor(this._dropMonitor);
@@ -83,7 +87,7 @@ export class DashSection extends BaseSection {
 
     _rebuildCollapsed() {
         this._dash.destroy_all_children();
-        const inset = this._scale(CONTENT_INSET + DASH_BORDER_WIDTH);
+        const inset = this._scale(CONTENT_INSET);
         this._layout = layoutDash(this._entries, this._availableWidth, inset, this._scaleFactor);
         this.preferredWidth = this._layout.width;
         const height = this._scale(SECTION_HEIGHT - DASH_BORDER_WIDTH * 2);
@@ -133,7 +137,7 @@ export class DashSection extends BaseSection {
     _openExpanded() {
         if (this._expandedSurface || !this._layout.hiddenCount)
             return;
-        const inset = this._scale(CONTENT_INSET + DASH_BORDER_WIDTH);
+        const inset = this._scale(CONTENT_INSET);
         const rows = expandedRows(this._entries, this._layout.iconSize,
             this._availableWidth - inset * 2, this._scaleFactor);
         const rowHeight = this._scale(DASH_ICON_SIZE + DASH_ITEM_INSET);
@@ -153,7 +157,7 @@ export class DashSection extends BaseSection {
             }
         });
         const scroll = new St.ScrollView({style_class: 'dash-expanded-content',
-            style: `padding: ${CONTENT_INSET}px;`, enable_mouse_scrolling: true,
+            style: `padding: ${CONTENT_PADDING}px;`, enable_mouse_scrolling: true,
             overlay_scrollbars: true});
         scroll.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);
         const scrollContent = new St.BoxLayout({vertical: true});

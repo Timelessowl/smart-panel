@@ -11,14 +11,17 @@ the bottom of every connected monitor:
 
 The transparent space between pieces remains part of the panel's input area.
 Layout values, panel padding, gaps, and widths can all be changed in
-`constant.js`. `PANEL_HEIGHT` is derived from `SECTION_HEIGHT` plus
-the top and bottom padding. Horizontal padding also stays inside the full-width
+`constant.js`. `SECTION_HEIGHT` is content height only. BottomPanel adds
+`SECTION_FRAME_WIDTH` and `SECTION_BORDER_WIDTH` on both sides when allocating
+sections. `PANEL_HEIGHT` adds those edges plus top and bottom padding to content
+height. Defaults are 64px content, an 8px translucent band, a 1px solid outline,
+82px outer section height, and 122px panel height. Horizontal padding stays inside the full-width
 panel actor, so visual outer spacing never becomes a pass-through gap.
 
 All five section classes derive from the GObject-registered `BaseSection`, which
 is itself an `St.Widget`. Registered actors use standard JavaScript constructors
 and are actors directly; there is no legacy `_init()` or `this.actor` wrapper.
-The base class owns only the shared surface, frame overlay, clipping, and a
+The base class owns only the shared native frame containing the content, and a
 plain `canExpand` property. Expandable sections set that property in their own
 constructors. `BottomPanel._updateGeometry()` is the single
 owner of panel and section placement and sizing. Dash and indicators opt into
@@ -27,8 +30,20 @@ expansion; Debian, search, and system sections do not. `SECTION_FRAME_WIDTH` in
 
 `themeManager.js` follows GNOME 48's system Dark Style preference and applies a
 `.dark` or `.light` class to every monitor panel. The two palettes live in
-`stylesheet.css`. Section surfaces and frames use solid GNOME-style colors;
-only intentionally empty space between sections remains transparent.
+`stylesheet.css`. Section surfaces are opaque; the surrounding frame uses 40%
+alpha by default, with an 8px default thickness and a separate 1px opaque outer
+outline (white in dark theme, black in light theme). BaseSection has a transparent
+background and contains an `St.Bin` frame. That frame paints the translucent
+background and solid outline, and uses native padding to inset its opaque content
+child. Native St allocation, `St.Bin`, and `Clutter.BinLayout` handle the inset,
+including CSS scaling; BaseSection has no custom allocation or paint clipping.
+Section content heights are 64 logical pixels and icon sizes are unchanged.
+The dash counts the frame padding and outline once in its width budget and fits
+its rows inside them. Existing control padding avoids a second frame inset.
+Frame alpha is configured in the dark/light frame background colors in `stylesheet.css`;
+band and outline thickness stay in `constant.js`. Transparency shows the scene behind
+the panel (wallpaper, or a window if one is physically underneath), not an
+extension-owned copy of the wallpaper.
 
 `monitorManager.js` discovers monitors dynamically and owns one independent
 panel instance per monitor. Panels are rebuilt when the monitor layout changes.

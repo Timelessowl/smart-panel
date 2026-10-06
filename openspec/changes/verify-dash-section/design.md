@@ -62,7 +62,10 @@ height; DashSection reports preferred width without sizing its panel.
 `layoutDash()` produces Launchpad, icon, separator, and overflow tokens. It tries
 40-pixel apps, then 32-pixel apps, then a visible prefix plus +N. Launchpad remains
 40 pixels. Width includes rounded item sizes, spacing, content inset, and border.
-`CONTENT_INSET` is the maximum of dash padding and section-frame width.
+`CONTENT_INSET` counts the frame's solid outline and native padding, any dash
+padding extending beyond that band, and the content's thin border, once each.
+The opaque dash child's CSS padding does not duplicate its parent's frame.
+Collapsed row height fits inside the content border without changing icon sizes.
 The running separator exists only with running items and stays with the first
 running token when `expandedRows()` wraps. On exceptionally narrow allocations
 the section clips rather than invading search; no extra behavior is invented.

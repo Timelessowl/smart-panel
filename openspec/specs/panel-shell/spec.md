@@ -57,15 +57,17 @@ The search placeholder SHALL remain horizontally centered with a bounded width.
 ### Requirement: Internal panel padding
 
 The panel SHALL use internal top, bottom, and horizontal padding rather than
-external margins. Its height SHALL equal the section height plus top and bottom
+external margins. SECTION_HEIGHT SHALL describe content height excluding the
+surrounding frame. Outer section height SHALL equal content height plus twice
+the sum of translucent band width and solid outline width. Panel height SHALL equal outer section height plus top and bottom
 padding. Transparent gaps and padding inside the panel SHALL remain part of
 its input area and SHALL NOT pass pointer events through to underlying windows.
 
 #### Scenario: Vertical padding is configured
 
-- **WHEN** section height is 64 logical pixels and both vertical paddings are 20
-- **THEN** panel height is 104 logical pixels
-- **AND** the section's outer height remains 64 logical pixels.
+- **WHEN** content height is 64 logical pixels, frame band is 8, outline is 1, and both vertical paddings are 20
+- **THEN** outer section height is 82 logical pixels and panel height is 122 logical pixels
+- **AND** the Debian button and single-indicator section have an outer width of 82 logical pixels.
 
 #### Scenario: Pointer is in a gap
 
@@ -74,25 +76,50 @@ its input area and SHALL NOT pass pointer events through to underlying windows.
 
 ### Requirement: Shared solid section frame
 
-Every visible section SHALL have a shared rounded, opaque surface and surrounding
-frame. Section bounds SHALL include the frame. Changing frame thickness SHALL
+Every visible section SHALL have a shared rounded, opaque interior surface and
+surrounding frame. A translucent frame SHALL reveal the scene behind the panel,
+not the section's own fill or control backgrounds. Section bounds SHALL include
+the frame. Changing frame thickness SHALL
 NOT shrink icons or other explicitly sized controls, or let them render outside
 their allocated section. The Debian, search, and system sections SHALL remain
 fixed-width; dash and indicator sections MAY grow only within their layout rules.
+BaseSection SHALL contain an St.Bin frame which contains the opaque content.
+The frame SHALL use native padding for its translucent band and an opaque CSS
+outline, using inherited St allocation rather than a custom allocation override
+or frame overlay. Default band width SHALL be 8 logical pixels and alpha SHALL
+be 40%. Outline width SHALL default to 1 logical pixel, white in dark theme and
+black in light theme.
 
-#### Scenario: Frame is configured to ten pixels
+#### Scenario: Default native frame
 
-- **WHEN** frame thickness is set to 10 logical pixels
+- **WHEN** frame thickness is set to 8 logical pixels
 - **THEN** it is accounted for inside each section's total layout bounds
 - **AND** the dash measures its content plus insets before requesting its width
 - **AND** no adjacent frames overlap because wrapping was omitted from geometry.
+
+#### Scenario: Solid outline surrounds the translucent band
+
+- **WHEN** a section uses the default frame in either system palette
+- **THEN** its 8px translucent band is surrounded by a separate 1px opaque outline
+- **AND** that outline is white in dark theme and black in light theme
+- **AND** native frame padding keeps opaque content inside the band.
+
+#### Scenario: Translucent frame over wallpaper
+
+- **WHEN** the frame uses 40% alpha and the panel is over the wallpaper
+- **THEN** the wallpaper is visible through the frame area
+- **AND** opaque fill and control hover painting do not extend under that frame
+- **AND** icon sizes and outer section bounds remain unchanged
+- **AND** native child allocation reserves the band and outline without manual clipping.
 
 ### Requirement: Theme-responsive presentation
 
 Panel sections, expanded dash, and dash insertion preview SHALL respond to the
 system Dark Style preference. Filled section surfaces SHALL be opaque. The frame
-SHALL contrast slightly with its surface: lighter in dark mode and darker in light
-mode. Text and symbolic controls SHALL remain readable in both modes.
+band SHALL use palette-specific colors, with configurable alpha and a 40% default.
+The frame's solid outline SHALL remain opaque in both palettes.
+Translucency SHALL NOT make the interior surface or controls translucent.
+Text and symbolic controls SHALL remain readable in both modes.
 
 #### Scenario: Dark Style changes while the extension is enabled
 
@@ -109,7 +136,8 @@ control bounds, spacing, frame, and reserved height SHALL use consistent units.
 #### Scenario: X11 uses two hundred percent scale
 
 - **WHEN** an X11 monitor uses a geometry scale of 2
-- **THEN** a 64-logical-pixel section occupies 128 stage pixels
+- **THEN** a 64-logical-pixel content area occupies 128 stage pixels
+- **AND** with an 8-logical-pixel band and 1-logical-pixel outline, outer section height is 164 stage pixels
 - **AND** icons, frame, gaps, and reservation remain aligned without double scaling.
 
 #### Scenario: Wayland uses native scaling

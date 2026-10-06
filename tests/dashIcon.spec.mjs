@@ -1,6 +1,6 @@
 import {readFile} from 'node:fs/promises';
 import {loadGjsModule, SignalObject} from './gjsHarness.mjs';
-import {DASH_BORDER_WIDTH, SECTION_FRAME_WIDTH, SECTION_HEIGHT} from '../constant.js';
+import {DASH_BORDER_WIDTH, SECTION_HEIGHT} from '../constant.js';
 
 async function fixture(scale) {
     const css = await readFile(new URL('../stylesheet.css', import.meta.url), 'utf8');
@@ -82,9 +82,7 @@ describe('Dash icon allocation', () => {
                         expect(dots.allocation.y1).toBe(icon.allocation.y2);
                         expect(Math.abs((dots.allocation.x1 + dots.allocation.x2) / 2 -
                             (icon.allocation.x1 + icon.allocation.x2) / 2)).toBeLessThanOrEqual(0.5);
-                        const bottomInset = rowHeight === 48 ? 0 :
-                            (SECTION_FRAME_WIDTH - DASH_BORDER_WIDTH) * scale;
-                        expect(dots.allocation.y2).toBeLessThanOrEqual(rowHeight * scale - bottomInset);
+                        expect(dots.allocation.y2).toBeLessThanOrEqual(rowHeight * scale);
                     }
                 }
             }

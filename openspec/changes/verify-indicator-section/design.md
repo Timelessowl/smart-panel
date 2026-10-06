@@ -38,8 +38,9 @@ For nonempty input it is true and the current preferred logical width is:
 INDICATOR_MIN_WIDTH + (count - 1) * INDICATOR_WIDTH_STEP
 ```
 
-The defaults are 64 and 32, respectively: counts 1, 2, 5, 10 request widths
-64, 96, 192, 352 logical pixels. BottomPanel converts the preferred width to
+The defaults are 82 (content height plus band and outline on both sides) and 32,
+respectively: counts 1, 2, 5, 10 request widths 82, 114, 210, 370 logical pixels.
+BottomPanel converts the preferred width to
 stage geometry and places the section from the right. BaseSection does not
 perform panel geometry. `canExpand = true` allows content-dependent width but
 does not create an expansion popup.

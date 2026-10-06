@@ -1,7 +1,7 @@
 import {loadGjsModule, SignalObject} from './gjsHarness.mjs';
 import {projectDash} from '../components/dash/dashProjection.js';
 import {
-    DASH_BORDER_WIDTH, DASH_ITEM_SPACING, DASH_PADDING, SECTION_FRAME_WIDTH,
+    DASH_BORDER_WIDTH, DASH_ITEM_SPACING, DASH_PADDING, SECTION_BORDER_WIDTH, SECTION_FRAME_WIDTH,
     SECTION_HEIGHT, DASH_DROP_PREVIEW_SIZE, DASH_DROP_PREVIEW_OPACITY,
 } from '../constant.js';
 
@@ -37,6 +37,7 @@ async function fixture(scale = 1) {
             return [true, x - stageX, y - stageY];
         }
         add_style_class_name() {}
+        remove_style_class_name() {}
         set_policy() {}
         queue_relayout() {}
         destroy_all_children() { this.get_children().forEach(child => child.destroy()); }
@@ -110,12 +111,15 @@ async function fixture(scale = 1) {
         },
     };
     function allocate(panel) {
-        panel.set_size(panel.preferredWidth, SECTION_HEIGHT * scale);
+        panel.set_size(panel.preferredWidth,
+            (SECTION_HEIGHT + (SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH) * 2) * scale);
         panel._frame.set_size(panel.width, panel.height);
-        panel._dash.set_size(panel.width, panel.height);
-        let x = (Math.max(DASH_PADDING, SECTION_FRAME_WIDTH) + DASH_BORDER_WIDTH) * scale;
+        const frame = (SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH) * scale;
+        panel._dash.set_position(frame, frame);
+        panel._dash.set_size(panel.width - frame * 2, panel.height - frame * 2);
+        let x = (Math.max(0, DASH_PADDING - SECTION_FRAME_WIDTH) + DASH_BORDER_WIDTH) * scale;
         for (const actor of panel._dash.get_children()) {
-            actor.set_position(x, (panel.height - actor.height) / 2);
+            actor.set_position(x, (panel._dash.height - actor.height) / 2);
             x += actor.width + DASH_ITEM_SPACING * scale;
         }
     }
@@ -186,7 +190,8 @@ describe('Dash drag and drop', () => {
         const dragged = f.view(p, 'terminal');
         const target = f.view(p, 'files');
         dragged._draggable.emit('drag-begin');
-        expect(p._frame.hiddenFromPick).toBe(true);
+        expect(p.get_children()).toEqual([p._frame]);
+        expect(p._frame.get_children()).toEqual([p._dash]);
         expect(f.pick(p, ...f.at(target, true))).toBe(target);
         expect(f.dispatch('hover', dragged, p, f.at(target, true))).toBe(f.DND.DragMotionResult.MOVE_DROP);
         expect(f.dispatch('drop', dragged, p, f.at(target, true))).toBe(true);
@@ -256,7 +261,7 @@ describe('Dash drag and drop', () => {
         dragged._draggable.emit('drag-begin');
         const [x, y] = target.get_transformed_position();
         const paddingPoint = [x + target.width * 0.75, p.y];
-        expect(f.pick(p, ...paddingPoint)).toBe(p._dash);
+        expect(f.pick(p, ...paddingPoint)).toBe(p._frame);
         expect(f.dispatch('hover', dragged, p, paddingPoint)).toBe(f.DND.DragMotionResult.MOVE_DROP);
         for (const monitor of f.monitors)
             monitor.dragMotion({targetActor: null});
@@ -290,11 +295,13 @@ describe('Dash drag and drop', () => {
         const surface = p._expandedSurface;
         expect(surface).toBeTruthy();
         const grid = surface._content.child.children[0];
-        // Model native allocation of the scroll content and decorative frame.
+        // Model native St allocation inside the frame's outline/padding and scroll border.
         surface._frame.set_size(surface.width, surface.height);
-        surface._content.set_size(surface.width, surface.height);
-        surface._content.child.set_size(surface.width, surface.height);
-        grid.set_position(11, 11);
+        const frame = SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH;
+        surface._content.set_position(frame, frame);
+        surface._content.set_size(surface.width - frame * 2, surface.height - frame * 2);
+        surface._content.child.set_size(surface._content.width, surface._content.height);
+        grid.set_position(DASH_BORDER_WIDTH, DASH_BORDER_WIDTH);
         const views = grid.children.filter(actor => actor.entry);
         const dragged = views.find(icon => icon.item.appId === 'calendar');
         const target = views.find(icon => icon.item.appId === 'terminal');

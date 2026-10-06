@@ -22,7 +22,8 @@ system configuration mutation.
 ### The parent owns size and placement
 
 Keep `canExpand` false. BottomPanel allocates the system section using SYSTEM_WIDTH
-(currently 176 logical pixels), SECTION_HEIGHT, and right horizontal padding.
+(currently 176 logical pixels), content height plus both frame edges, and right
+horizontal padding. SystemSection does not calculate those outer bounds itself.
 BaseSection adds its shared solid frame; SystemSection does not calculate
 monitor-dependent bounds. Indicator count changes cannot alter this anchor.
 
