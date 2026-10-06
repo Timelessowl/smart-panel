@@ -15,6 +15,7 @@ async function fixture(scale = 1) {
                 this.set_child(props.child);
         }
         add_child(child) { child.parent = this; this.children.push(child); }
+        add_effect(effect) { this.effect = effect; }
         set_child(child) { this.child = child; this.add_child(child); }
         insert_child_below(child, sibling) {
             child.parent = this;
@@ -84,6 +85,9 @@ async function fixture(scale = 1) {
             removeChrome: actor => chrome.delete(actor),
         }},
         'resource:///org/gnome/shell/ui/popupMenu.js': {},
+        [new URL('../effects/roundedBackgroundBlur.js', import.meta.url).href]: {
+            RoundedBackgroundBlur: class extends Actor {},
+        },
     };
     const {DashSection} = await loadGjsModule(
         new URL('../components/dashSection.js', import.meta.url), imports,
@@ -114,6 +118,7 @@ async function fixture(scale = 1) {
         panel.set_size(panel.preferredWidth,
             (SECTION_HEIGHT + (SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH) * 2) * scale);
         panel._frame.set_size(panel.width, panel.height);
+        panel._surface.set_size(panel.width, panel.height);
         const frame = (SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH) * scale;
         panel._dash.set_position(frame, frame);
         panel._dash.set_size(panel.width - frame * 2, panel.height - frame * 2);
@@ -190,7 +195,8 @@ describe('Dash drag and drop', () => {
         const dragged = f.view(p, 'terminal');
         const target = f.view(p, 'files');
         dragged._draggable.emit('drag-begin');
-        expect(p.get_children()).toEqual([p._frame]);
+        expect(p.get_children()).toEqual([p._surface]);
+        expect(p._surface.get_children()).toEqual([p._frame]);
         expect(p._frame.get_children()).toEqual([p._dash]);
         expect(f.pick(p, ...f.at(target, true))).toBe(target);
         expect(f.dispatch('hover', dragged, p, f.at(target, true))).toBe(f.DND.DragMotionResult.MOVE_DROP);
@@ -297,6 +303,7 @@ describe('Dash drag and drop', () => {
         const grid = surface._content.child.children[0];
         // Model native St allocation inside the frame's outline/padding and scroll border.
         surface._frame.set_size(surface.width, surface.height);
+        surface._surface.set_size(surface.width, surface.height);
         const frame = SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH;
         surface._content.set_position(frame, frame);
         surface._content.set_size(surface.width - frame * 2, surface.height - frame * 2);

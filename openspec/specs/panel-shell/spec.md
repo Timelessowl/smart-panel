@@ -127,6 +127,55 @@ Text and symbolic controls SHALL remain readable in both modes.
 - **THEN** all monitor panels and any open expanded dash use the matching palette
 - **AND** no panel reconstruction or Shell restart is required for the palette change.
 
+### Requirement: Reusable rounded background blur
+
+A GJS-only rounded background container SHALL wrap a St foreground widget without
+depending on section classes or overriding widget allocation. Native layout SHALL
+stack captured backdrop content below the foreground. An ACTOR-mode native blur
+and outer rounded mask SHALL apply only to the backdrop, using current allocation
+and foreground CSS corner radii. The foreground outline and controls SHALL stay
+sharp. Blur strength and brightness SHALL be independent of dimensions and corners.
+
+#### Scenario: Differently sized rounded widgets
+
+- **WHEN** separate rounded background containers wrap a square button and a wide search widget
+- **THEN** each blur follows its own widget's size and CSS corners
+- **AND** the original widget allocations and controls are unchanged.
+
+#### Scenario: Resize, theme change or monitor scaling
+
+- **WHEN** widget dimensions, CSS radii or native view scaling change
+- **THEN** the next paint uses the current geometry without manual configuration
+- **AND** background capture is bounded by the source framebuffer
+- **AND** unchanged capture geometry/context is reused independently per view.
+
+#### Scenario: Disabled blur or unavailable GPU buffer
+
+- **WHEN** the radius is zero or a GPU buffer cannot be allocated
+- **THEN** the original widget still paints normally
+- **AND** surface destruction or effect detachment drops cached buffer references.
+
+#### Scenario: GNOME 48.7 public GJS bindings
+
+- **WHEN** the capture paints with a PaintContext that has no get_stage_view method
+- **THEN** it selects the widget's current public stage view by matching its framebuffer
+- **AND** uses the view's boxed layout property without calling get_layout with no argument
+- **AND** feeds a real backdrop content child to ACTOR blur without calling the unavailable API.
+
+#### Scenario: Partial redraw behind a rounded surface
+
+- **WHEN** only part of the scene behind a surface is repainted
+- **THEN** capture copies only damaged rectangles and retains clean backdrop pixels
+- **AND** requests a full local repaint of overlapping surfaces to prevent stale-blur feedback
+- **AND** a new incomplete texture is not displayed
+- **AND** full repaints do not schedule a continuous repaint loop.
+
+#### Scenario: Parent destroys the surface natively
+
+- **WHEN** a parent actor destroys the rounded surface without calling a JavaScript destroy override
+- **THEN** the destroy signal releases capture buffers, view connections and backdrop content
+- **AND** the decorative backdrop never intercepts input or drag-and-drop picking.
+
 ### Requirement: Compositor-aware scaling
 
 The extension SHALL honor each monitor's X11 geometry scale and SHALL rely on

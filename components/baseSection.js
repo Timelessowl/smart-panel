@@ -2,6 +2,7 @@ import Clutter from "gi://Clutter";
 import GObject from "gi://GObject";
 import St from "gi://St";
 import Shell from "gi://Shell";
+import { RoundedBackgroundBlur } from "../effects/roundedBackgroundBlur.js";
 
 import { SECTION_BORDER_WIDTH, SECTION_FRAME_WIDTH } from "../constant.js";
 
@@ -30,10 +31,12 @@ export class BaseSection extends St.Widget {
       y_align: Clutter.ActorAlign.FILL,
       clip_to_allocation: true,
     });
-    this._frame.add_effect(
-      new Shell.BlurEffect({ mode: Shell.BlurMode.BACKGROUND, radius: 44 }),
-    );
-    this.add_child(this._frame);
+    // this._frame.add_effect(
+    //   new Shell.BlurEffect({ mode: Shell.BlurMode.BACKGROUND, radius: 99 }),
+    // );
+    this._surface = new RoundedBackgroundBlur({ radius: 99 });
+    this._surface.set_child(this._frame);
+    this.add_child(this._surface);
   }
 
   setSectionContent(content) {
@@ -52,12 +55,14 @@ export class BaseSection extends St.Widget {
   _setContentVisible(visible) {
     this._content.visible = visible;
     this._frame.visible = visible;
+    this._surface.visible = visible;
   }
 
   destroy() {
     this.canExpand = false;
     this._content = null;
     this._frame = null;
+    this._surface = null;
     super.destroy();
   }
 }

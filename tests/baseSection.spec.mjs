@@ -11,6 +11,7 @@ async function fixture() {
             this.children = [];
         }
         add_child(child) { this.children.push(child); }
+        add_effect(effect) { this.effect = effect; }
         set_child(child) { this.child = child; this.add_child(child); }
         add_style_class_name(name) { this.style_class = `${this.style_class ?? ''} ${name}`.trim(); }
         remove_style_class_name(name) {
@@ -22,6 +23,12 @@ async function fixture() {
         'gi://Clutter': {default: {BinLayout, ActorAlign: {FILL: 0}}},
         'gi://GObject': {default: {registerClass: cls => cls}},
         'gi://St': {default: {Widget: Actor, Bin: Actor}},
+        'gi://Shell': {default: {}},
+        [new URL('../effects/roundedBackgroundBlur.js', import.meta.url).href]: {
+            RoundedBackgroundBlur: class extends Actor {
+                constructor(props) { super(); this.blur = props; }
+            },
+        },
     });
     const section = new BaseSection();
     const content = new Actor({style_class: 'test-content', iconSize: 40});
@@ -37,9 +44,11 @@ describe('Native base section frame', () => {
         expect(section.style).toBeUndefined();
         expect(section._frame.style).toBe('padding: 8px; border-width: 1px;');
         expect(section.layout_manager instanceof BinLayout).toBeTrue();
-        expect(section.children).toEqual([section._frame]);
+        expect(section.children).toEqual([section._surface]);
+        expect(section._surface.children).toEqual([section._frame]);
         expect(section._frame.children).toEqual([content]);
         expect(section._frame.child).toBe(content);
+        expect(section._surface.blur.radius).toBeGreaterThan(0);
         expect(section._frame.hiddenFromPick).toBeUndefined();
         expect(Object.hasOwn(BaseSection.prototype, 'vfunc_allocate')).toBeFalse();
         expect(content.iconSize).toBe(40);
@@ -62,18 +71,22 @@ describe('Native base section frame', () => {
         section.width = 360;
         section.height = SECTION_HEIGHT + (SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH) * 2;
         const frame = section._frame;
+        const surface = section._surface;
         section._setContentVisible(false);
         expect(content.visible).toBeFalse();
         expect(frame.visible).toBeFalse();
+        expect(surface.visible).toBeFalse();
         expect(section.visible).toBeTrue();
         section._setContentVisible(true);
         expect(content.visible).toBeTrue();
         expect(frame.visible).toBeTrue();
+        expect(surface.visible).toBeTrue();
         expect([section.width, section.height]).toEqual([360,
             SECTION_HEIGHT + (SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH) * 2]);
         section.destroy();
         expect(content.destroyed).toBeTrue();
         expect(frame.destroyed).toBeTrue();
+        expect(surface.destroyed).toBeTrue();
     });
 
     it('uses 40% band alpha, an opaque white/black outline and an opaque content child', async () => {

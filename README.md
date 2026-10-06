@@ -45,6 +45,44 @@ band and outline thickness stay in `constant.js`. Transparency shows the scene b
 the panel (wallpaper, or a window if one is physically underneath), not an
 extension-owned copy of the wallpaper.
 
+Rounded background blur is reusable independently of sections:
+
+```javascript
+import {RoundedBackgroundBlur} from './effects/roundedBackgroundBlur.js';
+
+const surface = new RoundedBackgroundBlur({radius: 44, brightness: 1});
+surface.set_child(widget); // A St widget styled with CSS border-radius.
+parent.add_child(surface);
+```
+
+Each surface uses native `Clutter.BinLayout` to stack a decorative backdrop child
+below its foreground; no `vfunc_allocate` or per-section geometry code is needed.
+The capture/child/mask architecture follows
+[Blur My Shell PR #976](https://github.com/aunetx/blur-my-shell/pull/976).
+This implementation keeps GNOME's native Gaussian blur in `ACTOR` mode instead
+of importing that project's complete effects pipeline. `Shell.GLSLEffect` masks
+the finished blur, reading all four foreground CSS radii on every paint. The
+original band, outline and controls paint above it and stay sharp and clickable.
+
+Capture coordinates come from the active framebuffer's modelview, projection
+and viewport, so monitor origins and native scaling are not applied twice.
+Only damaged pixels are copied into each view's retained texture. A partial
+update requests a full local repaint, including intersecting blur surfaces, to
+avoid capturing stale blur; there is no continuous after-paint loop. The public
+`peek_stage_views()`/`layout` APIs select the view and convert damage coordinates;
+the unavailable `PaintContext.get_stage_view()` is never called. Buffers are
+reused while geometry/context are unchanged and released on view or surface
+destruction, including native destruction by a parent.
+
+Change `surface.blur.radius` or `surface.blur.brightness` directly; these native
+properties queue repaint automatically. A zero radius disables blurring.
+Brightness ranges from 0 to 1, with 1 preserving the scene. Capture failure
+leaves the foreground visible and logs one `Rounded background blur:` warning.
+No compiled helper is required. Jasmine doubles cover capture, native effect
+ordering, damage, scaling and cleanup; actual GPU output still needs a GNOME
+48.7 visual check after a Shell restart. The commented original BACKGROUND blur
+in BaseSection is retained for comparison.
+
 `monitorManager.js` discovers monitors dynamically and owns one independent
 panel instance per monitor. Panels are rebuilt when the monitor layout changes.
 Each panel determines its own scale in its constructor: Wayland uses a factor of

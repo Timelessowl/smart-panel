@@ -8,6 +8,7 @@ extension_dir="${HOME}/.local/share/gnome-shell/extensions/${extension_uuid}"
 
 mkdir -p \
     "${extension_dir}/components/dash" \
+    "${extension_dir}/effects" \
     "${extension_dir}/schemas"
 
 rm -f \
@@ -35,6 +36,9 @@ install -m 0644 "${script_dir}/themeManager.js" "${extension_dir}/themeManager.j
 install -m 0644 "${script_dir}/transientInputManager.js" "${extension_dir}/transientInputManager.js"
 install -m 0644 "${script_dir}/stylesheet.css" "${extension_dir}/stylesheet.css"
 install -m 0644 "${script_dir}/components/baseSection.js" "${extension_dir}/components/baseSection.js"
+for module in backdropCapture roundedBackgroundBlur; do
+    install -m 0644 "${script_dir}/effects/${module}.js" "${extension_dir}/effects/${module}.js"
+done
 install -m 0644 "${script_dir}/components/bottomPanel.js" "${extension_dir}/components/bottomPanel.js"
 install -m 0644 "${script_dir}/components/dashSection.js" "${extension_dir}/components/dashSection.js"
 for module in appItem windowItem dashProjection dashLayout dashSource dashIcon appActivation; do
