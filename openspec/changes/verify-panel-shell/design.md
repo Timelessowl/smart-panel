@@ -47,7 +47,7 @@ Per-section duplicated borders and an external wrapping manager are rejected.
 
 ### Reusable rounded background blur
 
-`effects/roundedBackgroundBlur.js` is a section-independent St.Widget using
+`externals/roundedBackgroundBlur.js` is a section-independent St.Widget using
 native BinLayout. It stacks a backdrop content actor below the unchanged frame.
 The architecture follows Blur My Shell PR #976: capture the live background into
 a texture, expose it as Clutter.Content, blur the child, then mask the result.
@@ -56,7 +56,7 @@ pipeline. A Shell.GLSLEffect mask reads foreground CSS corners and uses
 premultiplied-alpha blending. Both effect caches are refreshed at paint time
 because captured content changes externally, without a continuous redraw loop.
 
-`effects/backdropCapture.js` captures before any child offscreen effects run.
+`externals/backdropCapture.js` captures before any child offscreen effects run.
 Framebuffer modelview/projection/viewport determine pixel coordinates, avoiding
 double scaling. Public actor.peek_stage_views() identifies each framebuffer's
 view; its layout/scale convert damage regions. Only damaged rectangles are copied

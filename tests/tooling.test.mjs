@@ -24,7 +24,7 @@ function run(script, args = [], env = {}) {
 before(async () => {
     fixture = await mkdtemp(join(tmpdir(), 'panel-tooling-'));
     distribution = join(fixture, 'dist');
-    const directories = ['components', 'effects', 'schemas', 'scripts', 'style'];
+    const directories = ['components', 'externals', 'schemas', 'scripts', 'style'];
     for (const entry of await readdir(projectDirectory)) {
         if (directories.includes(entry) || /\.(js|mjs)$/.test(entry)
             || ['metadata.json', 'package.json'].includes(entry))

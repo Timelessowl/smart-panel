@@ -48,7 +48,7 @@ extension-owned copy of the wallpaper.
 Rounded background blur is reusable independently of sections:
 
 ```javascript
-import {RoundedBackgroundBlur} from './effects/roundedBackgroundBlur.js';
+import {RoundedBackgroundBlur} from './externals/roundedBackgroundBlur.js';
 
 const surface = new RoundedBackgroundBlur({radius: 44, brightness: 1});
 surface.set_child(widget); // A St widget styled with CSS border-radius.
@@ -59,6 +59,8 @@ Each surface uses native `Clutter.BinLayout` to stack a decorative backdrop chil
 below its foreground; no `vfunc_allocate` or per-section geometry code is needed.
 The capture/child/mask architecture follows
 [Blur My Shell PR #976](https://github.com/aunetx/blur-my-shell/pull/976).
+These reusable adaptations live directly in `externals/`; their references and
+local responsibilities are recorded in [externals/README.md](externals/README.md).
 This implementation keeps GNOME's native Gaussian blur in `ACTOR` mode instead
 of importing that project's complete effects pipeline. `Shell.GLSLEffect` masks
 the finished blur, reading all four foreground CSS radii on every paint. The
@@ -217,3 +219,6 @@ The English [OpenSpec index](openspec/README.md) links the master panel contract
 and Debian menu, dash, indicator, and system-section specs, designs, and tasks.
 Search behavior is intentionally not specified yet. Remaining implementation
 gaps and native acceptance checks are tracked explicitly rather than marked done.
+
+The [Just Perfection API assessment](docs/just-perfection-api-review.md) maps that
+extension's Shell overrides to our specifications and intended future integrations.

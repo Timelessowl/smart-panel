@@ -2,7 +2,7 @@ import Clutter from "gi://Clutter";
 import GObject from "gi://GObject";
 import St from "gi://St";
 import Shell from "gi://Shell";
-import { RoundedBackgroundBlur } from "../effects/roundedBackgroundBlur.js";
+import { RoundedBackgroundBlur } from "../externals/roundedBackgroundBlur.js";
 
 import { SECTION_BORDER_WIDTH, SECTION_FRAME_WIDTH } from "../constant.js";
 

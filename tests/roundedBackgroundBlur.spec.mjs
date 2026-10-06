@@ -104,7 +104,7 @@ async function fixture(options = {}) {
             util_set_hidden_from_pick(actor, hidden) { actor.hiddenFromPick = hidden; }}},
         'gi://St': {default: {Widget: Actor, Corner: {TOPLEFT: 0, TOPRIGHT: 1, BOTTOMRIGHT: 2, BOTTOMLEFT: 3}}},
     };
-    const {RoundedBackgroundBlur} = await loadGjsModule(new URL('../effects/roundedBackgroundBlur.js', import.meta.url), imports);
+    const {RoundedBackgroundBlur} = await loadGjsModule(new URL('../externals/roundedBackgroundBlur.js', import.meta.url), imports);
     const surface = new RoundedBackgroundBlur(options);
     const foreground = new Actor({radii: [16, 18, 20, 22]});
     surface.set_child(foreground);

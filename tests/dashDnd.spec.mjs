@@ -85,7 +85,7 @@ async function fixture(scale = 1) {
             removeChrome: actor => chrome.delete(actor),
         }},
         'resource:///org/gnome/shell/ui/popupMenu.js': {},
-        [new URL('../effects/roundedBackgroundBlur.js', import.meta.url).href]: {
+        [new URL('../externals/roundedBackgroundBlur.js', import.meta.url).href]: {
             RoundedBackgroundBlur: class extends Actor {},
         },
     };

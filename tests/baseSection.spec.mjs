@@ -24,7 +24,7 @@ async function fixture() {
         'gi://GObject': {default: {registerClass: cls => cls}},
         'gi://St': {default: {Widget: Actor, Bin: Actor}},
         'gi://Shell': {default: {}},
-        [new URL('../effects/roundedBackgroundBlur.js', import.meta.url).href]: {
+        [new URL('../externals/roundedBackgroundBlur.js', import.meta.url).href]: {
             RoundedBackgroundBlur: class extends Actor {
                 constructor(props) { super(); this.blur = props; }
             },
