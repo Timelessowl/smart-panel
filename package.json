@@ -2,10 +2,21 @@
   "name": "simple-bottom-panel",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
+    "build": "node scripts/build.mjs",
+    "pack": "node scripts/pack.mjs",
+    "install:local": "node scripts/install.mjs",
+    "test:tooling": "node --test tests/tooling.test.mjs",
     "test": "node --experimental-vm-modules ./node_modules/jasmine/bin/jasmine.js --config=tests/support/jasmine.mjs"
   },
   "devDependencies": {
-    "jasmine": "7.0.0"
+    "fflate": "^0.8.3",
+    "jasmine": "7.0.0",
+    "rollup": "^4.64.0",
+    "rollup-plugin-sass": "^1.16.0-rc.1",
+    "sass": "^1.105.1"
   }
 }

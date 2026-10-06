@@ -25,7 +25,7 @@ requirements. `.openspec.yaml` sets `skip_specs: true`; no delta spec is needed.
 
 ## Impact
 
-components/debianButton.js, the Debian popup selectors in stylesheet.css, and new Debian menu tests. No new launcher integrations or runtime dependencies.
+components/debianButton.js, the Debian popup selectors in style/_debian.scss, and new Debian menu tests. No new launcher integrations or runtime dependencies.
 
 This is a planning artifact only. Creating this change does not implement its
 unchecked tasks or establish native Shell acceptance.

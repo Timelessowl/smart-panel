@@ -1,4 +1,4 @@
-import {readFile} from 'node:fs/promises';
+import {stylesheet as css} from './stylesheet.mjs';
 import {loadGjsModule, SignalObject} from './gjsHarness.mjs';
 import {SECTION_BORDER_WIDTH, SECTION_FRAME_WIDTH, SECTION_HEIGHT} from '../constant.js';
 
@@ -90,7 +90,6 @@ describe('Native base section frame', () => {
     });
 
     it('uses 40% band alpha, an opaque white/black outline and an opaque content child', async () => {
-        const css = await readFile(new URL('../stylesheet.css', import.meta.url), 'utf8');
         expect(css.match(/\.panel-section\s*\{([^}]+)\}/)[1])
             .toMatch(/background-color:\s*transparent/);
         for (const palette of ['dark', 'light']) {

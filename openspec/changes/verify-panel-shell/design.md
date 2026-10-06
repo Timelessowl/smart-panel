@@ -36,7 +36,7 @@ is the opaque section content. The frame's native 8px padding exposes its
 and black in light theme. Native St allocation, St.Bin and Clutter.BinLayout handle
 border and padding without custom allocation or manual paint clipping. The frame
 is a parent container, not an overlay. Band and outline thickness come from
-`SECTION_FRAME_WIDTH` and `SECTION_BORDER_WIDTH`; palette colors live in `stylesheet.css`.
+`SECTION_FRAME_WIDTH` and `SECTION_BORDER_WIDTH`; palette colors live in `style/_themes.scss`.
 BottomPanel still owns outer section geometry. Control padding
 and dash row height fit inside the native border without resizing icons or
 counting the inset twice. During expansion the collapsed frame and content are
@@ -107,11 +107,15 @@ feature that created it.
 
 ### Installation stays file-based
 
-`install.sh` copies an explicit runtime file list and compiles the schema.
-It does not ship test tooling or OpenSpec artifacts. Known obsolete modules
-are removed by exact name. Jasmine is declared only as a development dependency
-in package.json; neither its packages nor the manifest are installed with the
-extension. Documentation validation tooling also remains outside the runtime.
+Rollup builds independent Shell and preferences entry points, preserving native
+`gi://` and `resource://` imports. Its Sass plugin compiles `style/stylesheet.scss`
+into `dist/stylesheet.css`; metadata and schema XML are emitted as build assets,
+and `glib-compile-schemas` compiles the schema. Independent Node scripts package
+the existing dist as a ZIP or install it into the user's extension directory.
+Installation stages the new build, replaces the previous directory, and can
+restore the previous files if replacement fails. Replacing the directory removes
+all obsolete modules. Development dependencies, tests, package manifests, and
+OpenSpec artifacts are excluded from dist and the installed extension.
 
 ## Risks / Trade-offs
 

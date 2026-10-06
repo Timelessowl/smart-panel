@@ -1,9 +1,8 @@
-import {readFile} from 'node:fs/promises';
+import {stylesheet as css} from './stylesheet.mjs';
 import {loadGjsModule, SignalObject} from './gjsHarness.mjs';
 import {DASH_BORDER_WIDTH, SECTION_HEIGHT} from '../constant.js';
 
 async function fixture(scale) {
-    const css = await readFile(new URL('../stylesheet.css', import.meta.url), 'utf8');
     const dotStyle = css.match(/\.dash-window-dot\s*\{([^}]+)\}/)[1];
     const dotSize = Number(dotStyle.match(/height:\s*(\d+)px/)[1]) * scale;
     class ActorBox {

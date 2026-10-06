@@ -232,13 +232,32 @@ GNOME Shell extensions directory. Runtime SHALL NOT depend on a bundler, Rollup,
 Node, or an installed development package. Installation SHALL include preferences
 and the compiled settings schema.
 
-#### Scenario: Install from the project directory
+Build, ZIP packaging, and local installation SHALL have independent Node scripts.
+The build SHALL bundle JavaScript with Rollup, compile Sass from the style
+directory to stylesheet.css, and compile the settings schema into dist. Packaging
+and installation SHALL consume the existing dist without implicitly rebuilding.
 
-- **WHEN** the user runs the installation script
+#### Scenario: Package the built extension
+
+- **WHEN** the user runs `npm run pack` after `npm run build`
+- **THEN** a `.shell-extension.zip` archive contains the dist files at its root
+- **AND** development dependencies, tests, and specifications are excluded.
+
+#### Scenario: Install the built extension locally
+
+- **WHEN** the user runs `npm run install:local` after `npm run build`
 - **THEN** runtime files are installed under
-  `.local/share/gnome-shell/extensions/simple-bottom-panel@local`
-- **AND** the schema is compiled without bundling JavaScript
+  `$XDG_DATA_HOME/gnome-shell/extensions/simple-bottom-panel@local`, defaulting to
+  `$HOME/.local/share/gnome-shell/extensions/simple-bottom-panel@local`
+- **AND** the already compiled schema is included
+- **AND** obsolete files from the previous extension installation are removed
 - **AND** instructions explain the required Shell restart or logout/login.
+
+#### Scenario: Package or install without a complete build
+
+- **WHEN** dist is absent or lacks required extension files
+- **THEN** packaging and installation fail with instructions to run the build
+- **AND** an existing local installation remains intact.
 
 ### Requirement: Defined feature boundaries
 

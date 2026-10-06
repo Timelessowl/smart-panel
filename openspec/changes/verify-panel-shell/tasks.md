@@ -19,7 +19,7 @@ Checked tasks record existing work inspected during baselining, not native accep
 
 ## 3. Deployment and cleanup
 
-- [x] 3.1 Confirm installation uses plain files and schema compilation; verify install.sh contains no JavaScript bundling step.
-- [ ] 3.2 Exercise the installer in a disposable local-extension target; verify every runtime import is installed and the schema compiles without copying tests or specs.
+- [x] 3.1 Confirm Rollup builds GJS and Sass into dist, and ZIP packaging and local installation are independent Node scripts with no runtime tooling dependency.
+- [x] 3.2 Exercise the build, ZIP packaging, and installer in disposable targets; verify native imports, compiled schemas, obsolete-file cleanup, and exclusion of tests and specs with npm run test:tooling.
 - [ ] 3.3 Validate native disable and monitor replacement with expansion, popup menus, and drag activity; verify no actors, timers, signals, previews, or Escape registration remain.
 - [ ] 3.4 Record native acceptance using a real X11 Shell restart or Wayland logout/login after updates; verify results are not based solely on disable/enable.

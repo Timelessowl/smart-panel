@@ -30,7 +30,7 @@ expansion; Debian, search, and system sections do not. `SECTION_FRAME_WIDTH` in
 
 `themeManager.js` follows GNOME 48's system Dark Style preference and applies a
 `.dark` or `.light` class to every monitor panel. The two palettes live in
-`stylesheet.css`. Section surfaces are opaque; the surrounding frame uses 40%
+`style/_themes.scss`. Section surfaces are opaque; the surrounding frame uses 40%
 alpha by default, with an 8px default thickness and a separate 1px opaque outer
 outline (white in dark theme, black in light theme). BaseSection has a transparent
 background and contains an `St.Bin` frame. That frame paints the translucent
@@ -40,7 +40,7 @@ including CSS scaling; BaseSection has no custom allocation or paint clipping.
 Section content heights are 64 logical pixels and icon sizes are unchanged.
 The dash counts the frame padding and outline once in its width budget and fits
 its rows inside them. Existing control padding avoids a second frame inset.
-Frame alpha is configured in the dark/light frame background colors in `stylesheet.css`;
+Frame alpha is configured in the dark/light frame background colors in `style/_themes.scss`;
 band and outline thickness stay in `constant.js`. Transparency shows the scene behind
 the panel (wallpaper, or a window if one is physically underneath), not an
 extension-owned copy of the wallpaper.
@@ -122,9 +122,10 @@ Valid drop targets show a translucent 16px app-icon preview at the insertion
 point, without resizing the dash. Its size and opacity live in `constant.js`.
 All stub code has been removed. The former stub launcher opens dash preferences.
 
-The extension runtime needs no bundler or package manager. Installation compiles
-only the GSettings schema, using `glib-compile-schemas`. Jasmine is a development-only
-test dependency and is not installed with the extension.
+The extension runtime needs no bundler or package manager. Rollup bundles the GJS
+modules and compiles Sass during development; GNOME imports and native APIs stay
+external. Node, Rollup, Sass, ZIP tooling, and Jasmine are development dependencies
+and are not installed with the extension.
 
 ## Window reservation
 
@@ -132,17 +133,51 @@ The panel always reserves its area on every monitor, so maximized windows stop
 above it. The bottom panel actor itself is registered as chrome and reserves its
 complete height, including the top and bottom padding.
 
-## Install
+## Build, package, and install
+
+Use Node.js 22 or newer and install the development dependencies with `npm ci`.
+Building also requires GLib's `glib-compile-schemas` on your PATH (usually provided
+by `libglib2.0-bin` on Debian/Ubuntu or `glib2` on Fedora).
+
+Each command is independent:
+
+- `npm run build` replaces `dist/` with bundled `extension.js` and `prefs.js`,
+  metadata, compiled `stylesheet.css`, schema XML, and `schemas/gschemas.compiled`.
+- `npm run pack` packages the existing `dist/` into
+  `releases/simple-bottom-panel@local.shell-extension.zip`. Extension files sit
+  at the ZIP root. This command does not rebuild or install anything.
+- `npm run install:local` installs the existing `dist/` into
+  `${XDG_DATA_HOME:-$HOME/.local/share}/gnome-shell/extensions/<uuid>/`.
+  It stages the complete build before replacing the previous extension directory,
+  removing obsolete modules from earlier installations. This command does not
+  rebuild or require a ZIP.
+
+Build first; packaging and local installation can then be run separately:
 
 ```sh
-chmod +x install.sh
-./install.sh
+npm ci
+npm run build
+npm run pack
+npm run install:local
 gnome-extensions enable simple-bottom-panel@local
 ```
 
 Restart GNOME Shell on X11 (`Alt+F2`, then `r`) or log out and back in on Wayland
-after installing/updating the source files. Open preferences with
+after installing/updating the build. Open preferences with
 `gnome-extensions prefs simple-bottom-panel@local`, or the Debian menu launcher.
+
+For a disposable installation or a custom extension directory, pass the full target:
+
+```sh
+npm run install:local -- --dest /tmp/simple-bottom-panel-test
+```
+
+Edit Sass in `style/`, using `style/stylesheet.scss` as the entry point. Shared
+dark/light palette maps live in `_themes.scss`; panel, Debian, dash, search, and
+system/indicator styles have separate partials. Rollup's Sass plugin compiles them
+into the `stylesheet.css` expected by GNOME Shell. `dist/` and `releases/` are
+generated and ignored by Git. Failed or missing builds must be fixed with
+`npm run build` before packaging or installation.
 
 ## Tests
 
@@ -151,12 +186,20 @@ Install the development dependencies and run the Jasmine suites:
 ```sh
 npm ci
 npm test
+npm run test:tooling
 ```
 
 Tests live in `tests/*.spec.mjs` and use Jasmine's `describe`, `it`, and `expect`.
 The GJS harness loads production modules against narrow API doubles; the test
 command enables Node's experimental VM modules for those imports. Jasmine
 randomizes spec order and fails specs with no expectations.
+
+`test:tooling` uses Node's test runner to build in a temporary project, inspect the
+ZIP, and install into disposable targets. It checks native import preservation,
+compiled Sass and schemas, obsolete-file cleanup, independent commands, and
+failure handling. It requires `glib-compile-schemas`. Stylesheet assertions in
+the Jasmine suites compile the Sass source directly, so `npm test` needs no
+pre-existing `dist/` or GLib compiler.
 
 To reproduce an order-dependent failure or run matching cases:
 
