@@ -24,7 +24,7 @@ requirements. `.openspec.yaml` sets `skip_specs: true`; no delta spec is needed.
 
 ## Impact
 
-src/components/baseSection.js, src/components/bottomPanel.js, src/monitorManager.js, src/themeManager.js, src/transientInputManager.js, src/extension.js, rollup.config.mjs, scripts/, src/style/, and development tests.
+src/components/baseSection.js, src/components/bottomPanel.js, src/monitorManager.js, src/themeManager.js, src/transientInputManager.js, src/extension/extension.js, rollup.config.js, src/style/, and development tests.
 
 This is a planning artifact only. Creating this change does not implement its
 unchecked tasks or establish native Shell acceptance.

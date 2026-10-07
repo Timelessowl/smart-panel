@@ -65,6 +65,9 @@ This implementation keeps GNOME's native Gaussian blur in `ACTOR` mode instead
 of importing that project's complete effects pipeline. `Shell.GLSLEffect` masks
 the finished blur, reading all four foreground CSS radii on every paint. The
 original band, outline and controls paint above it and stay sharp and clickable.
+The mask converts Clutter's padded offscreen texture back to actor coordinates,
+including its asymmetric buffer origin and native resource scale. Its curved
+edge therefore follows the widget allocation rather than the larger buffer.
 
 Capture coordinates come from the active framebuffer's modelview, projection
 and viewport, so monitor origins and native scaling are not applied twice.
@@ -92,9 +95,12 @@ one, while X11 uses that monitor's `geometry_scale`.
 
 ## Dash
 
-`src/components/dash/` contains `AppItem` and `WindowItem` models, one Shell-observing
-`DashSource`, the `DashIcon` view, and independently testable projection, layout,
-and activation logic. `DashSection` owns its views and session-only drag order;
+`src/components/dash/` contains one Shell-observing `DashSource`, the `DashIcon`
+view, and independent projection, layout, activation, drag/drop, and launch logic.
+The source exposes native `Shell.App` and `Meta.Window` objects through
+`getFavorites()`, `getRunningApps()`, `getOpenedWindows()`,
+`getOpenMonitorWindows(monitor)`, and `getAppWindows(app, monitor)`.
+`DashSection` owns its views and session-only drag order;
 `BottomPanel` remains the authority for its allocated bounds.
 
 Launchpad toggles overview and always uses a 40px icon. Favorites follow GNOME's
@@ -108,20 +114,28 @@ an outside click closes it without grabbing unrelated pointer input.
 Preferences provide two toggles, both off by default:
 
 - **One icon per window**: off shows one icon per app with up to four window
-  dots; on lets each favorite use its oldest `WindowItem` while running, or its
-  `AppItem` when no window exists. Additional windows are shown individually
+  dots; on lets each favorite represent its oldest visible window while running,
+  or its app when no visible window exists. Additional windows are shown individually
   and without dots in the running subsection.
 - **Only this monitor’s windows**: filters running icons and favorite dots to
   that monitor, across all workspaces. Favorites themselves remain visible on
-  every monitor. Clicking a favorite with no local window opens a new window.
+  every monitor. Clicking a favorite with no local window requests a new window
+  and places that new window on the clicked dash’s monitor. Existing remote
+  windows are left in place. New-window menu actions use the same monitor scope.
 
 Repeated clicks on a multi-window app focus its windows in opening order, then
-minimize all its represented windows, then start the cycle again. Right-click
-menus offer desktop-file actions and favorite/unfavorite controls. Dragging
+minimize all its represented windows, then start the cycle again. App icons derive
+from GNOME's `PanelMenu.Button` and use its standard popup menu, with desktop-file
+actions and favorite/unfavorite controls. A shared native menu manager handles
+menu switching and grabs. Left-click still activates apps; right-click opens the
+menu. `DashDragDrop` owns draggable setup, drop delegates, previews, local order,
+and deferred refresh, leaving `DashSection` to assemble and activate the dash. Dragging
 reorders within a subsection on that monitor only; dragging a running item into
 Favorites adds it to GNOME's system favorites. Local ordering is not persisted.
 Valid drop targets show a translucent 16px app-icon preview at the insertion
 point, without resizing the dash. Its size and opacity live in `src/constant.js`.
+Shell state continues updating during a drag. Only the dragged dash’s view
+rebuild waits until drag actors are released; other panels update immediately.
 All stub code has been removed. The former stub launcher opens dash preferences.
 
 The extension runtime needs no bundler or package manager. Rollup bundles the GJS
@@ -137,100 +151,66 @@ complete height, including the top and bottom padding.
 
 ## Build, package, and install
 
-Use Node.js 22.15 or newer and install the development dependencies with `npm ci`.
-Building also requires GLib's `glib-compile-schemas` on your PATH (usually provided
-by `libglib2.0-bin` on Debian/Ubuntu or `glib2` on Fedora).
+Install the development dependencies with `npm ci --include=optional`. Install
+on the machine that runs the build; Rollup's native dependency differs between
+macOS and Linux. Building also requires GLib's `glib-compile-schemas` on your PATH
+(`libglib2.0-bin` on Debian/Ubuntu or `glib2` on Fedora).
 
-Each command is independent:
+The entry points and schema live in `src/extension/`; shared components and Sass
+remain under `src/components/` and `src/style/`. `rollup.config.js` follows the
+provided configuration: ES modules are preserved, Sass produces `stylesheet.css`,
+metadata is generated from `package.json`, and schemas, assets and translations
+are copied from `src/extension/` before schema compilation.
 
-- `npm run build` replaces `dist/` with bundled `extension.js` and `prefs.js`,
-  metadata, compiled `stylesheet.css`, schema XML, and `schemas/gschemas.compiled`.
-- `npm run pack` packages the existing `dist/` into
-  `releases/simple-bottom-panel@local.shell-extension.zip`. Extension files sit
-  at the ZIP root. This command does not rebuild or install anything.
-- `npm run install:local` installs the existing `dist/` into
-  `${XDG_DATA_HOME:-$HOME/.local/share}/gnome-shell/extensions/<uuid>/`.
-  It stages the complete build before replacing the previous extension directory,
-  removing obsolete modules from earlier installations. This command does not
-  rebuild or require a ZIP.
-
-Build first; packaging and local installation can then be run separately:
+- `npm run build` builds the extension in `dist/`.
+- `npm run package` builds it and creates
+  `build/simple-bottom-panel.v1.0.0.shell-extension.zip` with the extension files
+  at the ZIP root.
+- `npm run dev` installs that existing ZIP with `gnome-extensions install --force`.
+  `npm run dev:install` is the same installation step.
+- `npm run clean` removes `build/`, `dist/`, and `dist-tests/`.
 
 ```sh
-npm ci
-npm run build
-npm run pack
-npm run install:local
+npm ci --include=optional
+npm run clean
+npm run package
+npm run dev
 gnome-extensions enable simple-bottom-panel@local
 ```
 
-Restart GNOME Shell on X11 (`Alt+F2`, then `r`) or log out and back in on Wayland
-after installing/updating the build. Open preferences with
-`gnome-extensions prefs simple-bottom-panel@local`, or the Debian menu launcher.
+The commands do not restart the session or stream logs. Reload Shell manually
+on X11 (`Alt+F2`, then `r`) or log out and back in on Wayland after updating.
+Open preferences with `gnome-extensions prefs simple-bottom-panel@local` or the
+Debian menu launcher. Native behavior is currently verified against Shell 48.7;
+the package's 45–49 list reproduces the supplied configuration.
 
-For a disposable installation or a custom extension directory, pass the full target:
+## Development checks
 
-```sh
-npm run install:local -- --dest /tmp/simple-bottom-panel-test
-```
-
-Edit Sass in `src/style/`, using `src/style/stylesheet.scss` as the entry point. Shared
-dark/light palette maps live in `_themes.scss`; panel, Debian, dash, search, and
-system/indicator styles have separate partials. Rollup's Sass plugin compiles them
-into the `stylesheet.css` expected by GNOME Shell. `dist/` and `releases/` are
-generated and ignored by Git. Failed or missing builds must be fixed with
-`npm run build` before packaging or installation.
-
-## Tests
-
-Runtime JavaScript lives in `src/`, preserving the component and external-module
-directories. TypeScript checks that JavaScript with `allowJs` and `checkJs`; no
-TypeScript output is installed. Checking is gradual (`strict: false`), and
-`tsconfig.json` also includes future `.ts` files. Two boxed Clutter constructors
-retain targeted `@ts-expect-error` comments because the GIR definitions declare
-only their static constructors.
-The GIR definitions and GNOME Shell module declarations follow Shell 48, with
-pinned GIR versions and dependency overrides to keep namespace types consistent.
-
-Use `@/` for source imports. Rollup, TypeScript, and the Node test loader resolve
-it to `src/`. Import Shell modules through `@girs/gnome-shell`, for example
-`import * as Main from '@girs/gnome-shell/ui/main'`; Rollup follows those packages'
-re-exports to native `resource://` modules. GIR libraries keep their native
-`gi://` default namespace imports. Only classes use named imports; constants and
-helper functions use namespaces such as `Constants.SECTION_HEIGHT` and
-`DashLayout.layoutDash`. Node tooling and tests use package aliases `#scripts/`,
-`#tests/`, and `#rollup` for their own modules.
-
-Install the development dependencies and run the Jasmine suites:
+`npm run type:check` checks runtime JavaScript with `jsconfig.tsc.json`; no
+TypeScript output is installed. `npm run lint`, `npm run format:check`, and
+`npm run code:check` provide the photographed lint/format workflow; the matching
+fix commands edit the source. Runtime imports keep `@/` mapped to `src/`, native
+GI namespace imports, and `@girs/gnome-shell` re-exports.
 
 ```sh
-npm ci
-npm run typecheck
+npm run type:check
 npm test
-npm run test:tooling
+npm run test:unit
+npm run test:integration
 ```
 
-Tests live in `tests/*.spec.mjs` and use Jasmine's `describe`, `it`, and `expect`.
-The GJS harness loads production modules against narrow API doubles; the test
-command enables Node's experimental VM modules for those imports. Jasmine
-randomizes spec order and fails specs with no expectations.
+`rollup.config.test.js` builds the Jasmine suites from `src/tests/` into
+`dist-tests/tests/`. Unit suites use narrow GJS API doubles and compile Sass
+without needing a pre-existing distribution. The command enables Node's VM
+modules for the GJS harness. Integration suites build/package in temporary
+projects, check metadata, preserved imports, compiled styles and schemas, and
+verify ZIP installation using a temporary stand-in for `gnome-extensions`.
+They require `glib-compile-schemas` and never change the desktop session.
+These tests do not establish native GNOME runtime acceptance.
 
-`test:tooling` uses Node's test runner to build in a temporary project, inspect the
-ZIP, and install into disposable targets. It checks native import preservation,
-compiled Sass and schemas, source import conventions, obsolete-file cleanup,
-independent commands, and failure handling. It requires `glib-compile-schemas`. Stylesheet assertions in
-the Jasmine suites compile the Sass source directly, so `npm test` needs no
-pre-existing `dist/` or GLib compiler.
-
-To reproduce an order-dependent failure or run matching cases:
-
-```sh
-npm test -- --seed=12345
-npm test -- --filter="Dash drag and drop"
-```
-
-Node and Jasmine are development tooling only. These tests do not establish
-native GNOME runtime acceptance; the extension still runs directly in Shell.
+`npm run docs` generates API documentation in `docs/api/`. `npm run docs:serve`
+serves `docs/`, and `npm run docs:watch` runs the photographed JSDoc watch command.
+Generated build, test, ZIP and API documentation output is ignored by Git.
 
 ## Specifications
 

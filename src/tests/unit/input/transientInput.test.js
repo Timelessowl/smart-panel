@@ -1,5 +1,5 @@
-import * as GjsHarness from '#tests/gjsHarness.mjs';
-import {SignalObject} from '#tests/gjsHarness.mjs';
+import * as GjsHarness from '@/tests/gjsHarness.js';
+import {SignalObject} from '@/tests/gjsHarness.js';
 
 async function fixture() {
     let pointer = [0, 0, 0];
@@ -24,7 +24,7 @@ async function fixture() {
         }},
     };
     const {TransientInputManager} = await GjsHarness.loadGjsModule(
-        new URL('../src/transientInputManager.js', import.meta.url), imports,
+        new URL('transientInputManager.js', GjsHarness.sourceDirectory), imports,
         {global: {display, get_pointer: () => pointer}});
     return {manager: new TransientInputManager(), display, permissions, ungrabbed,
         click(x, y) { pointer = [x, y, 0]; poll(); pointer = [x, y, 1]; return poll(); }};

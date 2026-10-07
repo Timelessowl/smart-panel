@@ -6,7 +6,7 @@ The real dash and drag/drop fixes are implemented, but API-double coverage does 
 
 ## What Changes
 
-- Record shared model/source ownership and panel-local projection, activation, and order.
+- Record shared native-state/source ownership and panel-local projection, activation, and order.
 - Maintain projection, layout, activation, source, indicator, drag/drop, and dismissal regression coverage.
 - Verify native menus, drop acceptance, preview cleanup, expansion, and multi-monitor behavior.
 
@@ -24,7 +24,7 @@ requirements. `.openspec.yaml` sets `skip_specs: true`; no delta spec is needed.
 
 ## Impact
 
-src/components/dashSection.js, src/components/dash/*, src/prefs.js, the extension schema, src/transientInputManager.js, and tests. No stub controls or new application-discovery policy.
+src/components/dashSection.js, src/components/dash/*, src/extension/prefs.js, the extension schema, src/transientInputManager.js, and tests. No stub controls or new application-discovery policy.
 
 This is a planning artifact only. Creating this change does not implement its
 unchecked tasks or establish native Shell acceptance.

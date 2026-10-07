@@ -1,3 +1,6 @@
 node_modules/
 dist/
+build/
+dist-tests/
+docs/api/
 releases/

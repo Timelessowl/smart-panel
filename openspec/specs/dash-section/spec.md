@@ -21,6 +21,9 @@ installation prerequisites. The Launchpad is not an application/window item.
 The dash SHALL use GNOME's application, window, and system-favorite state rather
 than mock population controls. Metadata and window changes SHALL update the
 presentation. Focusing another app SHALL NOT reorder running icons by recency.
+One shared source SHALL expose favorites, running apps, eligible open windows,
+and windows by monitor through explicit queries returning native Shell objects.
+Monitor views SHALL own rendering entries and local order.
 
 #### Scenario: Running window changes
 
@@ -121,7 +124,8 @@ workspaces. Favorites themselves SHALL remain on every panel.
 
 - **WHEN** filtering is enabled and a favorite has no window on this panel's monitor
 - **THEN** its favorite icon remains with no running indicator
-- **AND** clicking it opens a new window rather than focusing a remote window.
+- **AND** clicking it requests a new window on this panel's monitor
+- **AND** existing windows on other monitors are not moved or selected by the dash.
 
 #### Scenario: Window is on an inactive workspace
 
@@ -133,7 +137,9 @@ workspaces. Favorites themselves SHALL remain on every panel.
 In per-app mode each app icon SHALL show one dot per visible window, capped at
 four, and no dots for zero windows. In per-window mode favorite icons SHALL show
 at most one dot and running-window icons SHALL show none. Dots SHALL be centered
-below the actual icon and SHALL NOT alter its position or size request.
+below the actual icon, with a three-pixel diameter and a three-pixel gap. They
+SHALL NOT alter its position or size request. Dash button hover highlights SHALL
+be square, centered on their content, with sharp corners.
 
 #### Scenario: Window count changes
 
@@ -308,12 +314,15 @@ in the project's layout constants.
 
 ### Requirement: Safe refresh during drag and drop
 
-Dash source updates SHALL be deferred while a drag is active. An accepted drop
-SHALL finish releasing drag actors before rebuilding views. Ending or cancelling
-a drag SHALL resume updates and clean up drag-specific state.
+The shared dash source SHALL continue observing and updating state during a
+drag. Only the dragging panel's actor rebuild SHALL be deferred while its drag
+actors are in use. Other panels SHALL continue updating. An accepted drop SHALL
+finish releasing drag actors before rebuilding views. Ending or cancelling a
+drag SHALL apply pending view updates and clean up drag-specific state.
 
 #### Scenario: Source changes while dragging
 
 - **WHEN** application state changes during an active drag
 - **THEN** the dragged view is not destroyed by an immediate source refresh
-- **AND** the new state is projected after the drag ends.
+- **AND** other panels update from the shared source during the drag
+- **AND** the dragging panel projects the new state after drag actors are released.

@@ -1,10 +1,10 @@
 import * as Assert from 'node:assert/strict';
 import * as Files from 'node:fs/promises';
 import * as Path from 'node:path';
-import * as Test from 'node:test';
 import * as Url from 'node:url';
 import * as Parser from 'rollup/parseAst';
-import * as Build from '#scripts/shared.mjs';
+
+const projectDirectory = process.cwd();
 
 async function modules(directory) {
     const paths = [];
@@ -18,10 +18,10 @@ async function modules(directory) {
     return paths;
 }
 
-Test.test('source, tests and tooling use aliases and import only classes by name', async () => {
-    const paths = [Path.join(Build.projectDirectory, 'rollup.config.mjs')];
-    for (const directory of ['src', 'scripts', 'tests'])
-        paths.push(...await modules(Path.join(Build.projectDirectory, directory)));
+it('source and tests use aliases and import only classes by name', async () => {
+    const paths = [];
+    for (const directory of ['src'])
+        paths.push(...await modules(Path.join(projectDirectory, directory)));
     const declarations = new Map();
     for (const path of paths)
         declarations.set(path, Parser.parseAst(await Files.readFile(path, 'utf8')).body);
@@ -41,7 +41,7 @@ Test.test('source, tests and tooling use aliases and import only classes by name
                 }
                 Assert.equal(binding.type, 'ImportSpecifier', `${path}: use a namespace for ${id}`);
                 const target = id.startsWith('@/')
-                    ? Path.join(Build.projectDirectory, 'src', id.slice(2))
+                    ? Path.join(projectDirectory, 'src', id.slice(2))
                     : Url.fileURLToPath(import.meta.resolve(id));
                 if (id.startsWith('@girs/')) {
                     const types = await Files.readFile(target.replace(/\.js$/, '.d.ts'), 'utf8');

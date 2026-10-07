@@ -1,6 +1,8 @@
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
+// Retained for the commented native BACKGROUND blur comparison below.
+// eslint-disable-next-line no-unused-vars
 import Shell from 'gi://Shell';
 import { RoundedBackgroundBlur } from '@/externals/roundedBackgroundBlur.js';
 

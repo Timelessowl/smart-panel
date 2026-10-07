@@ -1,17 +1,30 @@
-.dash-app-button {
-    border-radius: 11px;
+.dash-app-button,
+.dash-app-button:hover,
+.dash-app-button:active,
+.dash-app-button:focus {
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
     font-weight: 600;
     padding: 0;
+    -minimum-hpadding: 0;
+    -natural-hpadding: 0;
+}
+
+.dash-hover-highlight {
+    border-radius: 0;
 }
 
 .dash-window-dots {
     spacing: 2px;
+    padding-top: 3px;
 }
 
 .dash-window-dot {
-    width: 2px;
-    height: 2px;
-    border-radius: 1px;
+    width: 3px;
+    height: 3px;
+    border-radius: 1.5px;
 }
 
 .dash-drop-preview {

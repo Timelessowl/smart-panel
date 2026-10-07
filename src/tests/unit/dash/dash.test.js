@@ -1,45 +1,36 @@
-import {AppItem} from '@/components/dash/appItem.js';
-import {WindowItem} from '@/components/dash/windowItem.js';
 import * as DashProjection from '@/components/dash/dashProjection.js';
 import * as DashLayout from '@/components/dash/dashLayout.js';
 import * as AppActivation from '@/components/dash/appActivation.js';
 
-const app = id => ({id: `app:${id}`, appId: id, name: id});
-const window = (appItem, id, monitor = 0) => ({
-    id: `window:${id}`, stableId: id, appId: appItem.appId, monitor,
-    window: {get_stable_sequence: () => id},
+const app = id => ({get_id: () => id, get_name: () => id});
+const window = (app, id, monitor = 0) => ({
+    id: `window:${id}`, app, get_stable_sequence: () => id,
+    get_monitor: () => monitor, get_title: () => `Window ${id}`,
 });
 const firefox = app('firefox');
 const files = app('files');
 const terminal = app('terminal');
 const editor = app('editor');
 const hardcodedIds = new Set(['firefox', 'files']);
-const snapshot = overrides => ({favorites: [firefox, files],
-    running: [firefox, terminal], hardcodedIds, perWindow: false,
-    monitorIndex: 0, monitorOnly: false,
-    windows: [window(firefox, 1), window(firefox, 2, 1), window(terminal, 3)], ...overrides});
+const snapshot = overrides => {
+    const data = {favorites: [firefox, files], running: [firefox, terminal],
+        hardcodedIds, perWindow: false, monitorIndex: 0, monitorOnly: false,
+        windows: [window(firefox, 1), window(firefox, 2, 1), window(terminal, 3)], ...overrides};
+    if (data.monitorOnly)
+        data.windows = data.windows.filter(win => win.get_monitor() === data.monitorIndex);
+    data.windowApps = new Map(data.windows.map(win => [win, win.app]));
+    return data;
+};
 
-describe('Dash models, projection, layout and activation', () => {
-    it('models refresh metadata without creating or owning actors', () => {
-        let name = 'App';
-        const appInfo = {get_icon: () => 'icon'};
-        const shellApp = {get_id: () => 'id', get_name: () => name,
-            get_app_info: () => appInfo, get_state: () => 1, get_windows: () => [],
-            create_icon_texture: size => ({size})};
-        const item = new AppItem(shellApp);
-        expect(item.appInfo).toBe(appInfo);
-        expect(item.icon).toBe('icon');
-        expect(item.createIcon(40)).toEqual({size: 40});
-        let monitor = 0;
-        let title = 'First';
-        const win = new WindowItem({get_stable_sequence: () => 10,
-            get_title: () => title, get_monitor: () => monitor}, item);
-        name = 'Updated'; title = 'Second'; monitor = 2;
-        item.refresh(); win.refresh();
-        expect(item.name).toBe('Updated');
-        expect(win.title).toBe('Second');
-        expect(win.monitor).toBe(2);
-        expect(win.appInfo).toBe(appInfo);
+describe('Dash projection, layout and activation', () => {
+    it('view descriptions retain native identities without mutating apps or windows', () => {
+        const data = snapshot({perWindow: true});
+        const result = DashProjection.projectDash(data);
+        expect(result.favorites[0].item.app).toBe(firefox);
+        expect(result.favorites[0].item.window).toBe(data.windows[0]);
+        expect(result.favorites[0].representedWindow).toBe(data.windows[0]);
+        expect(firefox.id).toBeUndefined();
+        expect(data.windows[0].appId).toBeUndefined();
     });
 
     it('per-app projection excludes favorites from running and caps dots at four', () => {
@@ -48,15 +39,15 @@ describe('Dash models, projection, layout and activation', () => {
         ]}));
         expect(result.favorites[0].indicatorCount).toBe(4);
         expect(result.favorites[1].indicatorCount).toBe(0);
-        expect(result.running.map(entry => entry.item)).toEqual([terminal]);
+        expect(result.running.map(entry => entry.item.app)).toEqual([terminal]);
         expect(result.running[0].indicatorCount).toBe(1);
     });
 
     it('per-window favorites absorb only the first window and running has no dots', () => {
         const result = DashProjection.projectDash(snapshot({perWindow: true}));
         expect(result.favorites[0].representedWindow.id).toBe('window:1');
-        expect(result.favorites[0].item).toBe(result.favorites[0].representedWindow);
-        expect(result.favorites[1].item).toBe(files);
+        expect(result.favorites[0].item.window).toBe(result.favorites[0].representedWindow);
+        expect(result.favorites[1].item.app).toBe(files);
         expect(result.favorites[0].indicatorCount).toBe(1);
         expect(result.running.map(entry => entry.item.id)).toEqual(['window:2', 'window:3']);
         expect(result.running.every(entry => entry.indicatorCount === 0)).toBeTruthy();
@@ -74,11 +65,11 @@ describe('Dash models, projection, layout and activation', () => {
         }
     });
 
-    it('per-window favorite returns to its AppItem when its last visible window closes', () => {
+    it('per-window favorite returns to its app when its last visible window closes', () => {
         const running = DashProjection.projectDash(snapshot({perWindow: true}));
         expect(running.favorites[0].item.id).toBe('window:1');
         const closed = DashProjection.projectDash(snapshot({perWindow: true, windows: []}));
-        expect(closed.favorites[0].item).toBe(firefox);
+        expect(closed.favorites[0].item.app).toBe(firefox);
         expect(closed.favorites[0].representedWindow).toBe(null);
         expect(closed.favorites[0].indicatorCount).toBe(0);
     });
@@ -91,10 +82,10 @@ describe('Dash models, projection, layout and activation', () => {
     });
 
     it('running order is local and new items follow manually ordered items', () => {
-        const data = snapshot({running: [terminal, editor]});
-        const local = DashProjection.projectDash({...data, runningOrder: [editor.id, terminal.id]});
-        expect(local.running.map(entry => entry.item)).toEqual([editor, terminal]);
-        expect(DashProjection.projectDash(data).running.map(entry => entry.item)).toEqual([terminal, editor]);
+        const data = snapshot({running: [terminal, editor], windows: [window(terminal, 1), window(editor, 2)]});
+        const local = DashProjection.projectDash({...data, runningOrder: ['app:editor', 'app:terminal']});
+        expect(local.running.map(entry => entry.item.app)).toEqual([editor, terminal]);
+        expect(DashProjection.projectDash(data).running.map(entry => entry.item.app)).toEqual([terminal, editor]);
     });
 
     it('40px then 32px then overflow, including launchpad, separator and frame widths', () => {
@@ -158,7 +149,7 @@ describe('Dash models, projection, layout and activation', () => {
     });
 
     it('multi-window activation cycles first, second, minimize all, first', () => {
-        const entry = {item: firefox, windows: [window(firefox, 1), window(firefox, 2)]};
+        const entry = {item: {appId: firefox.get_id()}, windows: [window(firefox, 1), window(firefox, 2)]};
         let cycle = null;
         const actions = [];
         for (let index = 0; index < 4; index++) {
@@ -170,9 +161,9 @@ describe('Dash models, projection, layout and activation', () => {
     });
 
     it('changing app or its window set resets the cycle; an empty filtered favorite launches', () => {
-        const entry = {item: firefox, windows: [window(firefox, 1), window(firefox, 2)]};
+        const entry = {item: {appId: firefox.get_id()}, windows: [window(firefox, 1), window(firefox, 2)]};
         const first = AppActivation.nextAppAction(null, entry);
-        expect(AppActivation.nextAppAction(first.cycle, {...entry, item: terminal}).action.window.id).toBe('window:1');
+        expect(AppActivation.nextAppAction(first.cycle, {...entry, item: {appId: terminal.get_id()}}).action.window.id).toBe('window:1');
         expect(AppActivation.nextAppAction(first.cycle, {...entry,
             windows: [window(firefox, 1), window(firefox, 3)]}).action.window.id).toBe('window:1');
         expect(AppActivation.nextAppAction(first.cycle, {...entry, windows: []}).action.type).toBe('launch');

@@ -149,6 +149,13 @@ sharp. Blur strength and brightness SHALL be independent of dimensions and corne
 - **AND** background capture is bounded by the source framebuffer
 - **AND** unchanged capture geometry/context is reused independently per view.
 
+#### Scenario: Offscreen buffer padding at rounded borders
+
+- **WHEN** Clutter enlarges the offscreen buffer beyond the widget paint volume
+- **THEN** the rounded mask converts texture coordinates back to allocation coordinates
+- **AND** the blur remains inside the CSS outline without shrinking the widget or changing blur strength
+- **AND** asymmetric padding and native resource scaling do not shift the curved edge.
+
 #### Scenario: Disabled blur or unavailable GPU buffer
 
 - **WHEN** the radius is zero or a GPU buffer cannot be allocated
@@ -232,32 +239,27 @@ GNOME Shell extensions directory. Runtime SHALL NOT depend on a bundler, Rollup,
 Node, or an installed development package. Installation SHALL include preferences
 and the compiled settings schema.
 
-Build, ZIP packaging, and local installation SHALL have independent Node scripts.
-The build SHALL bundle JavaScript with Rollup, compile Sass from the style
-directory to stylesheet.css, and compile the settings schema into dist. Packaging
-and installation SHALL consume the existing dist without implicitly rebuilding.
+The build SHALL follow the provided Rollup configuration and preserve JavaScript
+modules, compile Sass to stylesheet.css, generate metadata from package.json,
+and copy and compile the settings schema into dist. ZIP packaging SHALL run the
+same build with packaging enabled. Development installation SHALL install the
+existing ZIP through the GNOME extension CLI without rebuilding, restarting the
+session, or streaming logs.
 
-#### Scenario: Package the built extension
+#### Scenario: Package the extension
 
-- **WHEN** the user runs `npm run pack` after `npm run build`
-- **THEN** a `.shell-extension.zip` archive contains the dist files at its root
+- **WHEN** the user runs `npm run package`
+- **THEN** Rollup builds dist and creates a versioned `.shell-extension.zip` in build
+- **AND** the archive contains the dist files at its root
 - **AND** development dependencies, tests, and specifications are excluded.
 
-#### Scenario: Install the built extension locally
+#### Scenario: Install the packaged extension locally
 
-- **WHEN** the user runs `npm run install:local` after `npm run build`
-- **THEN** runtime files are installed under
-  `$XDG_DATA_HOME/gnome-shell/extensions/simple-bottom-panel@local`, defaulting to
-  `$HOME/.local/share/gnome-shell/extensions/simple-bottom-panel@local`
+- **WHEN** the user runs `npm run dev` or `npm run dev:install`
+- **THEN** `gnome-extensions install --force` installs the existing versioned ZIP
 - **AND** the already compiled schema is included
-- **AND** obsolete files from the previous extension installation are removed
-- **AND** instructions explain the required Shell restart or logout/login.
-
-#### Scenario: Package or install without a complete build
-
-- **WHEN** dist is absent or lacks required extension files
-- **THEN** packaging and installation fail with instructions to run the build
-- **AND** an existing local installation remains intact.
+- **AND** the command does not restart Shell or stream logs
+- **AND** instructions explain the required manual Shell restart or logout/login.
 
 ### Requirement: Defined feature boundaries
 

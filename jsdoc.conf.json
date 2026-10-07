@@ -1,0 +1,12 @@
+{
+  "plugins": ["./jsdoc-types.cjs"],
+  "source": {
+    "include": ["src/"],
+    "includePattern": "\\.js$",
+    "exclude": ["src/tests/"]
+  },
+  "opts": {
+    "destination": "docs/api/",
+    "recurse": true
+  }
+}

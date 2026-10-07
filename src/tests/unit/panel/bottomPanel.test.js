@@ -1,5 +1,5 @@
-import * as GjsHarness from '#tests/gjsHarness.mjs';
-import {SignalObject} from '#tests/gjsHarness.mjs';
+import * as GjsHarness from '@/tests/gjsHarness.js';
+import {SignalObject} from '@/tests/gjsHarness.js';
 import * as Constants from '@/constant.js';
 
 async function fixture(wayland, geometryScale) {
@@ -36,10 +36,10 @@ async function fixture(wayland, geometryScale) {
         ['searchSection', 'SearchSection', Actor],
         ['systemSection', 'SystemSection', Actor],
     ]) {
-        imports[new URL(`../src/components/${file}.js`, import.meta.url).href] = {[name]: type};
+        imports[new URL(`components/${file}.js`, GjsHarness.sourceDirectory).href] = {[name]: type};
     }
     const {BottomPanel} = await GjsHarness.loadGjsModule(
-        new URL('../src/components/bottomPanel.js', import.meta.url), imports);
+        new URL('components/bottomPanel.js', GjsHarness.sourceDirectory), imports);
     const monitor = {index: 0, x: 200, y: 100, width: 1920, height: 1080,
         geometry_scale: geometryScale};
     return {panel: new BottomPanel(monitor, {}), monitor};

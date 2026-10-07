@@ -3,7 +3,9 @@
     "target": "ES2023",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2023"],
+    "lib": [
+      "ES2023"
+    ],
     "types": [],
     "allowJs": true,
     "checkJs": true,
@@ -11,8 +13,16 @@
     "noEmit": true,
     "skipLibCheck": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
-  "include": ["src/**/*.js", "src/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/extension/**/*.js",
+    "src/components/**/*.js",
+    "src/externals/**/*.js",
+    "src/*.js"
+  ]
 }

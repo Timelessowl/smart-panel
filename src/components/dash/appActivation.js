@@ -6,7 +6,7 @@ export function nextAppAction(previous, entry) {
     if (windows.length === 1)
         return {action: {type: 'focus', window: windows[0]}, cycle: null};
 
-    const signature = windows.map(item => item.id).join('|');
+    const signature = windows.map(window => window.get_stable_sequence()).join('|');
     const index = previous?.appId === entry.item.appId && previous.signature === signature
         ? previous.nextIndex : 0;
     const action = index < windows.length

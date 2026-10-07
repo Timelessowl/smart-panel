@@ -30,6 +30,7 @@ export const INDICATOR_ICON_SIZE = 16;
 export const DASH_ICON_SIZE = 40;
 export const DASH_SMALL_ICON_SIZE = 32;
 export const DASH_ITEM_INSET = 8;
+export const DASH_EXPANDED_ROW_HEIGHT = DASH_ICON_SIZE + DASH_ITEM_INSET * 2;
 export const DASH_SEPARATOR_WIDTH = 8;
 export const DASH_ITEM_SPACING = 4;
 export const DASH_PADDING = 6;

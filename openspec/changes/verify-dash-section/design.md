@@ -4,14 +4,14 @@
 
 The contract is [dash-section](../../specs/dash-section/spec.md). This design
 records the current real-dash implementation and its clarified behavior, not
-the removed mock-app architecture. Automated coverage exists for models,
+the removed mock-app architecture. Automated coverage exists for native identity,
 projection, layout, activation, source lifecycle, dot allocation, drag/drop,
 and expansion dismissal. All use Jasmine suites with Node/GJS API doubles; native Shell
 acceptance is a separate remaining task.
 
 ## Goals / Non-Goals
 
-Goals: shared authoritative models, monitor-local views and orders, deterministic
+Goals: shared authoritative Shell state, monitor-local views and orders, deterministic
 activation, bounded layout, safe transient input, and real favorite mutations.
 
 Non-goals: persistent/shared drag order, active-workspace-only filtering, search
@@ -20,21 +20,31 @@ and a third shrink size below 32 logical pixels.
 
 ## Decisions
 
-### Models do not own actors
+### Native state instead of wrapper models
 
-`AppItem` stores app identity, metadata, state, and icon creation information.
-`WindowItem` stores stable window identity, title, monitor, eligibility, and its
-associated AppItem. Neither model owns panel actors. `DashIcon` is a registered
-`St.Button` view of either model; its activation, menu, and drag behavior delegate
-to its owning DashSection. This avoids coupling shared state to one monitor's
-layout or reconstructing app identity for every view.
+`AppItem` and `WindowItem` were removed after review. They copied metadata from
+`Shell.App` and `Meta.Window` without owning useful behavior, introducing stale
+state and another refresh lifecycle. Adding menus to these wrappers would mix
+monitor-specific policy into shared objects. Native objects already provide
+stable identity, metadata, icon creation, and operations.
+
+`DashSource` owns observation and eligible-window state. `DashSection` supplies
+monitor-scoped windows to the projection, which builds disposable rendering
+entries holding native references and display labels. `DashIcon` renders those
+entries. `DashIcon` adds actions directly to its standard native popup menu;
+`appActivation` selects click actions; `DashLauncher` handles the asynchronous
+placement of newly launched windows. No replacement model classes are needed.
 
 ### One source, independent projections
 
 The extension owns one `DashSource`, which observes Shell AppSystem,
 WindowTracker, AppFavorites, window events, and the two settings. It reuses
-models and coalesces refreshes. Each `DashSection` calls `projectDash()` with its
-monitor index and local order arrays. App-wide metadata is shared; projected
+native app/window references and coalesces refreshes. It exposes
+`getFavorites()`, `getRunningApps()`, `getOpenedWindows()`,
+`getOpenMonitorWindows(monitor)`, `getAppWindows(app, monitor)`, and
+`getWindowApp(window)`. Returned collections are copies. Each `DashSection`
+queries its monitor scope and calls `projectDash()` with native references and
+local order arrays. App-wide metadata is shared; projected
 windows, indicator counts, views, expansion, and activation cycle are local.
 MonitorManager subscriptions trigger per-panel refreshes and geometry updates.
 
@@ -48,7 +58,7 @@ app ID as tie-breaker, rather than Shell's MRU order.
 ### Projection owns membership, not activation
 
 Per-app mode excludes favorite apps from running. Per-window mode uses the
-oldest visible WindowItem in a favorite slot, falling back to AppItem when idle;
+oldest visible native window in a favorite slot, falling back to the app when idle;
 that represented window is excluded from running. Additional windows remain
 separate. Monitor filtering affects windows and dots, not favorite membership.
 All workspaces are included; no active-workspace selector is introduced.
@@ -72,11 +82,15 @@ the section clips rather than invading search; no extra behavior is invented.
 
 ### Dots are an allocation overlay
 
-`DashIconContent` requests only the app texture size, centers its actual native
-dimensions, and allocates dots centered immediately below that texture.
+`DashButtonContent` requests only the foreground size and centers its actual native
+dimensions. A square, sharp-cornered highlight sits behind that foreground; it
+does not stretch to the full row height. The same content wrapper is used by
+app, Launchpad and overflow buttons. Dots are allocated below the app texture.
 Adding dots does not alter preferred size or move the texture. This supports
 native icon scaling rather than assuming raw icon_size equals stage pixels.
-The current dot diameter is two logical pixels with two-pixel spacing.
+The dot diameter is three logical pixels with two-pixel spacing and three pixels
+of padding above the dots. Expanded rows have enough vertical inset for the
+larger indicators without clipping.
 
 ### Expansion is a non-modal top-chrome surface
 
@@ -94,19 +108,53 @@ inside; outside-pointer dismissal pauses during a drag.
 `nextAppAction()` implements oldest, next, minimize-all, repeat for per-app mode.
 Its cycle signature includes app identity and eligible window identities so a
 different app/window set resets cycling. Per-window views focus their exact
-window. Empty favorites call `open_new_window(-1)`; with monitor filtering they
-do not activate a window on a different monitor. The baseline does not add
-explicit post-launch window relocation beyond native app behavior.
+window. Activation queries current windows at click time, so a stale view cannot
+focus or minimize a window that has moved off its monitor. Empty favorites
+request a new window; with monitor filtering they never select a remote window.
+
+Shell's `open_new_window()` and `launch_action()` have a workspace argument but
+no monitor argument. `DashLauncher` records pre-launch windows and observes the
+first new eligible window for each requested app. It moves only that new window
+to the requested monitor, and repeats placement on its first frame to account
+for initial mapping. Existing windows are excluded; simultaneous requests claim
+distinct new windows. Tracking expires after 15 seconds, and signals/timers are
+released on first frame, unmanage, launch failure, or shutdown. A removed monitor
+is never used as a movement target. Without isolation, native placement is kept.
+Single-window apps can decline to create a new window; the extension cannot
+force another instance. App-based matching also cannot distinguish an unrelated
+window opened by the same app while its launch request is pending.
+
+### Icons use native panel menus
+
+`DashIcon` extends GNOME's `PanelMenu.Button`, uses its standard container and
+`setMenu()` lifecycle, and fills a normal `PopupMenu` with `addAction()`. There is
+no separate menu-descriptor module or custom popup class. A shared native
+`PopupMenuManager` handles grabs, menu switching, Escape and outside clicks.
+The arrow points down so menus open above the bottom dash. Native hide/destroy
+paths close and release menus; open-state signals keep expanded-dash dismissal
+aware of related menu actors.
+
+A native `Clutter.ClickAction` activates apps on left-click/touch release and is
+cancelled at drag begin. Event handling keeps right-click/Menu key for the popup
+and Enter/Space for activation; other popup keyboard navigation stays native.
+Desktop actions, monitor-scoped launches and favorite eligibility are evaluated
+when filling the popup directly.
 
 ### Drag acceptance is actor-tree aware
 
+`DashDragDrop` owns one controller per section: native draggable setup, drag
+monitoring, drop validation, insertion previews, temporary local orders and
+post-release refresh. `DashSection` supplies projection and surface updates and
+receives one change callback. It contains no Shell DND plumbing or drag timers.
+
 Native DND uses the icon's `_delegate`. Icon delegates accept before/after drops;
 dash/grid and outer section delegates cover padding or background picks by
-finding the nearest DashIcon in their local coordinates. Shared frames and
+finding the nearest DashIcon in row coordinates after transforming native
+container/actor positions. PanelMenu buttons keep their standard containers. Shared frames and
 insertion previews are hidden from pick. An opaque decorative actor must not
 terminate target traversal before a delegate can be reached.
 
-Orders are per-section app IDs for favorites and model IDs for running. Fixed
+Orders are per-section app IDs for favorites and app/stable-window IDs for running. Fixed
 favorite icons are not draggable. A running-to-favorites drop updates the target
 panel's favorite order and GNOME AppFavorites membership. Other panels receive
 the membership event but keep their own order arrays. No order is saved to
@@ -122,10 +170,13 @@ Size and opacity are in src/constant.js. Per-section DND monitors and a source
 drag-end subscription remove it on leave, invalid hover, drop, cancellation,
 close/refresh, or destruction.
 
-Drag begin pauses the shared source and outside-pointer dismissal. Drop returns
-acceptance immediately but defers favorite/order updates to an idle callback,
-after DND releases its actors. Drag-end resumes source updates. Success does
-not restore the dragged clone before the queued rebuild.
+Drag begin defers only that section's actor rebuild and outside-pointer
+dismissal. The shared source keeps observing Shell and other panels keep
+refreshing. Source and geometry changes mark the dragging view for refresh after
+actor release. Drop returns acceptance immediately but defers favorite/order
+updates to an idle callback after DND releases its actors. Drag-end schedules
+any pending view refresh for an idle callback. Success does not restore the
+dragged clone before the queued rebuild.
 
 ### Menus and preferences use native boundaries
 
@@ -153,7 +204,7 @@ settings are persisted.
 ## Migration Plan
 
 The real-dash migration already removed all stub modules and controls. The
-installer ships the model/source modules, preferences, and compiled schema, and
+installer ships the source/view modules, preferences, and compiled schema, and
 removes obsolete installed stub files by exact name. Do not restore the old app
 count preference or persist local order. Future verification fixes use the same
 file installer and proper Shell restart; the user's system favorite membership

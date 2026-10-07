@@ -1,0 +1,6 @@
+node_modules/
+dist/
+build/
+dist-tests/
+docs/api/
+package-lock.json

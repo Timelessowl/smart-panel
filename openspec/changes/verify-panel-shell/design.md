@@ -3,7 +3,7 @@
 ## Context
 
 The master contract is [panel-shell](../../specs/panel-shell/spec.md).
-`src/extension.js` creates a shared `DashSource` and a `MonitorManager`.
+`src/extension/extension.js` creates a shared `DashSource` and a `MonitorManager`.
 The manager owns one `BottomPanel` per discovered monitor, plus a shared
 `ThemeManager` and `TransientInputManager`. Monitor changes currently destroy
 and recreate panels. Shared observer state is separate from per-panel views.
@@ -105,22 +105,21 @@ explicit drag ghost allow transparency. `TransientInputManager` handles expanded
 dash dismissal without a stage-wide input grab. Popup ownership stays with the
 feature that created it.
 
-### Installation stays file-based
+### Build and ZIP installation
 
-Runtime JavaScript and Sass live in `src/`. Source imports use the `@/` alias,
-and Shell resource modules are imported through `@girs/gnome-shell` re-exports.
-Only classes use named imports; constants and helper functions use namespaces.
-TypeScript checks the existing JavaScript using GNOME 48 GIR definitions.
+Runtime entry points and schemas live in `src/extension/`; shared components and
+Sass remain under `src/`. The `@/` alias resolves to src and Shell resource modules
+are imported through `@girs/gnome-shell` re-exports. Only runtime classes use named
+imports; constants and helpers use namespaces. Build configuration follows the
+user-supplied Rollup example, including its plugin imports and latest dependencies.
 
-Rollup builds independent Shell and preferences entry points, preserving native
-`gi://` and `resource://` imports. Its Sass plugin compiles `src/style/stylesheet.scss`
-into `dist/stylesheet.css`; metadata and schema XML are emitted as build assets,
-and `glib-compile-schemas` compiles the schema. Independent Node scripts package
-the existing dist as a ZIP or install it into the user's extension directory.
-Installation stages the new build, replaces the previous directory, and can
-restore the previous files if replacement fails. Replacing the directory removes
-all obsolete modules. Development dependencies, tests, package manifests, and
-OpenSpec artifacts are excluded from dist and the installed extension.
+`rollup.config.js` preserves ES modules and native imports, compiles Sass, generates
+metadata from package.json, copies schemas/assets/po, and compiles schemas with
+`glib-compile-schemas`. `package=1 rollup -c` additionally creates the versioned
+ZIP under build. `dev` delegates to `dev:install`, which installs the existing ZIP
+through `gnome-extensions install --force`. No automatic restart or log command
+is included. Run clean explicitly before packaging when stale output is possible.
+Tests are bundled separately into dist-tests and never enter the runtime build.
 
 ## Risks / Trade-offs
 

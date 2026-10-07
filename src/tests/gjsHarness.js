@@ -1,7 +1,8 @@
 import * as Files from 'node:fs/promises';
 import * as VM from 'node:vm';
+import * as Url from 'node:url';
 
-const sourceDirectory = new URL('../src/', import.meta.url);
+export const sourceDirectory = Url.pathToFileURL(`${process.cwd()}/src/`);
 
 // Evaluate production GJS modules against narrow API doubles, without GNOME.
 export async function loadGjsModule(path, imports, globals = {}) {
@@ -10,19 +11,20 @@ export async function loadGjsModule(path, imports, globals = {}) {
     async function load(url) {
         if (modules.has(url))
             return modules.get(url);
-        let module;
-        if (imports[url]) {
-            const exports = imports[url];
-            module = new VM.SyntheticModule(Object.keys(exports), function () {
-                for (const [name, value] of Object.entries(exports))
-                    this.setExport(name, value);
-            }, {context, identifier: url});
-        } else {
-            module = new VM.SourceTextModule(await Files.readFile(new URL(url), 'utf8'),
+        // Cache the pending read too: diamond imports must share class identity.
+        const pending = (async () => {
+            if (imports[url]) {
+                const exports = imports[url];
+                return new VM.SyntheticModule(Object.keys(exports), function () {
+                    for (const [name, value] of Object.entries(exports))
+                        this.setExport(name, value);
+                }, {context, identifier: url});
+            }
+            return new VM.SourceTextModule(await Files.readFile(new URL(url), 'utf8'),
                 {context, identifier: url});
-        }
-        modules.set(url, module);
-        return module;
+        })();
+        modules.set(url, pending);
+        return pending;
     }
     const root = await load(path.href);
     await root.link((specifier, parent) => {

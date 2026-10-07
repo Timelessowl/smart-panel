@@ -1,6 +1,6 @@
 import * as Files from 'node:fs/promises';
-import * as GjsHarness from '#tests/gjsHarness.mjs';
-import {SignalObject} from '#tests/gjsHarness.mjs';
+import * as GjsHarness from '@/tests/gjsHarness.js';
+import {SignalObject} from '@/tests/gjsHarness.js';
 
 async function fixture(options = {}) {
     class Node {
@@ -20,6 +20,18 @@ async function fixture(options = {}) {
         remove_effect(effect) { this.effects = this.effects.filter(value => value !== effect); effect.vfunc_set_actor(null); }
         set_content(content) { this.content = content; }
         get_paint_opacity() { return this.opacity; }
+        get_resource_scale() { return Math.ceil(this.resourceScale ?? 1); }
+        get_allocation_box() {
+            return {x1: this.x ?? 0, y1: this.y ?? 0,
+                get_width: () => this.width, get_height: () => this.height};
+        }
+        get_paint_volume() {
+            if (this.noPaintVolume)
+                return null;
+            const bounds = this.paintVolume ?? {x: 0, y: 0, width: this.width, height: this.height};
+            return {get_origin: () => ({x: bounds.x, y: bounds.y}),
+                get_width: () => bounds.width, get_height: () => bounds.height};
+        }
         get_theme_node() { return {get_border_radius: corner => this.radii[corner]}; }
         get_transformed_extents() {
             return {origin: {x: this.x ?? 0, y: this.y ?? 0}, size: {width: this.width, height: this.height}};
@@ -44,8 +56,13 @@ async function fixture(options = {}) {
             expect(components).toBe(1); expect(values.length).toBe(1);
             this.uniforms[name] = values[0];
         }
-        get_texture() { return {get_width: () => this.actor.width * this.resourceScale,
-            get_height: () => this.actor.height * this.resourceScale}; }
+        get_texture() {
+            const bounds = this.actor.paintVolume ?? this.actor;
+            // Clutter enlarges an offscreen paint volume by three logical
+            // pixels before allocating at the ceiled resource scale.
+            return {get_width: () => (Math.round(bounds.width) + 3) * this.actor.get_resource_scale(),
+                get_height: () => (Math.round(bounds.height) + 3) * this.actor.get_resource_scale()};
+        }
         get_pipeline() { return {set_blend: blend => { this.blend = blend; }}; }
         vfunc_paint(node, context, flags) { this.paint = {node, context, flags}; }
         vfunc_paint_target() { this.paintedTarget = true; }
@@ -105,11 +122,10 @@ async function fixture(options = {}) {
             util_set_hidden_from_pick(actor, hidden) { actor.hiddenFromPick = hidden; }}},
         'gi://St': {default: {Widget: Actor, Corner: {TOPLEFT: 0, TOPRIGHT: 1, BOTTOMRIGHT: 2, BOTTOMLEFT: 3}}},
     };
-    const {RoundedBackgroundBlur} = await GjsHarness.loadGjsModule(new URL('../src/externals/roundedBackgroundBlur.js', import.meta.url), imports);
+    const {RoundedBackgroundBlur} = await GjsHarness.loadGjsModule(new URL('externals/roundedBackgroundBlur.js', GjsHarness.sourceDirectory), imports);
     const surface = new RoundedBackgroundBlur(options);
     const foreground = new Actor({radii: [16, 18, 20, 22]});
     surface.set_child(foreground);
-    surface._mask.resourceScale = 1;
     let matrixScale = 1, originX = 3, originY = 7;
     const source = {
         get_context: () => context, get_width: () => 1920, get_height: () => 1080,
@@ -172,9 +188,10 @@ describe('Captured-child rounded background blur', () => {
     it('reads CSS corners at paint time and masks premultiplied output at native resource scale', async () => {
         const f = await fixture();
         const mask = f.surface._mask;
-        mask.resourceScale = 2;
+        f.surface._backdrop.resourceScale = 2;
         mask.vfunc_paint_target({}, {});
         expect(mask.uniforms).toEqual({width: 200, height: 82, pixel_size: 0.5,
+            texture_width: 406, texture_height: 170, offset_x: -2, offset_y: -2,
             radius_tl: 16, radius_tr: 18, radius_br: 20, radius_bl: 22});
         f.foreground.radii = [0, 200, 4, 8];
         mask.vfunc_paint_target({}, {});
@@ -182,6 +199,60 @@ describe('Captured-child rounded background blur', () => {
         expect(mask.snippet[2]).toContain('cogl_color_out *= 1.0 - smoothstep');
         expect(mask.blend).toContain('SRC_COLOR, DST_COLOR');
         expect(mask.paintedTarget).toBeTrue();
+        f.surface.destroy();
+    });
+
+    it('maps padded texture pixels to the allocation at every native resource scale', async () => {
+        const f = await fixture();
+        const backdrop = f.surface._backdrop;
+        const mask = f.surface._mask;
+        for (const scale of [1, 1.25, 1.5, 2, 3]) {
+            backdrop.resourceScale = scale;
+            mask.vfunc_paint_target({}, {});
+            const u = mask.uniforms;
+            const resourceScale = Math.ceil(scale);
+            expect(u.pixel_size).toBe(1 / resourceScale);
+            // GNOME's offscreen quad starts 2 logical pixels before the
+            // allocation. Its first two columns must not become widget fill.
+            expect(u.offset_x).toBe(-2);
+            expect(u.offset_y).toBe(-2);
+            expect(u.texture_width * u.pixel_size + u.offset_x).toBe(201);
+            expect(u.texture_height * u.pixel_size + u.offset_y).toBe(83);
+            expect(mask.snippet[2]).toContain('vec2(texture_width, texture_height) * pixel_size');
+            expect(mask.snippet[2]).toContain('+ vec2(offset_x, offset_y)');
+        }
+        f.surface.destroy();
+    });
+
+    it('keeps asymmetric padding aligned with fractional allocations and paint-volume origins', async () => {
+        const f = await fixture();
+        const backdrop = f.surface._backdrop;
+        const mask = f.surface._mask;
+        backdrop.width = 200.25; backdrop.height = 82.75;
+        mask.vfunc_paint_target({}, {});
+        expect(mask.uniforms.width).toBe(200.25);
+        expect(mask.uniforms.height).toBe(82.75);
+        expect(mask.uniforms.texture_width).toBe(203);
+        expect(mask.uniforms.texture_height).toBe(86);
+        expect(mask.uniforms.offset_x).toBe(-2);
+        expect(mask.uniforms.offset_y).toBe(-2);
+        backdrop.paintVolume = {x: -4, y: -6, width: 208, height: 94};
+        mask.vfunc_paint_target({}, {});
+        expect(mask.uniforms.texture_width).toBe(211);
+        expect(mask.uniforms.texture_height).toBe(97);
+        expect(mask.uniforms.offset_x).toBe(-6);
+        expect(mask.uniforms.offset_y).toBe(-8);
+        f.surface.destroy();
+    });
+
+    it('uses allocation-relative padding when a paint volume is unavailable', async () => {
+        const f = await fixture();
+        const backdrop = f.surface._backdrop;
+        backdrop.noPaintVolume = true;
+        backdrop.x = 40.25; backdrop.y = 8.5;
+        f.surface._mask.vfunc_paint_target({}, {});
+        expect(f.surface._mask.uniforms.offset_x).toBe(-2);
+        expect(f.surface._mask.uniforms.offset_y).toBe(-1);
         f.surface.destroy();
     });
 
@@ -317,7 +388,7 @@ describe('Captured-child rounded background blur', () => {
         expect(f.surface.blur.radius).toBe(0);
         expect(Object.hasOwn(Object.getPrototypeOf(f.surface), 'vfunc_allocate')).toBeFalse();
         expect(() => f.surface.set_child(new f.Actor())).toThrowError(/only have one/);
-        const base = await Files.readFile(new URL('../src/components/baseSection.js', import.meta.url), 'utf8');
+        const base = await Files.readFile(new URL('components/baseSection.js', GjsHarness.sourceDirectory), 'utf8');
         expect(base).toContain('//   new Shell.BlurEffect({ mode: Shell.BlurMode.BACKGROUND, radius: 99 }),');
         f.surface.destroy();
     });

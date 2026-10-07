@@ -4,9 +4,9 @@ context: |
   Simple Bottom Panel is a GNOME Shell 48.7 extension implemented in plain GJS
   ES modules, St, Clutter, and GObject. No runtime Node dependency.
   UUID: simple-bottom-panel@local. npm run build uses Rollup and Sass to create
-  dist with bundled GJS, stylesheet.css, metadata, and compiled GSettings schemas.
-  npm run pack independently archives dist; npm run install:local independently
-  installs dist into the standard per-user GNOME Shell extensions directory.
+  dist with preserved GJS modules, stylesheet.css, generated metadata, and compiled GSettings schemas.
+  npm run package builds and archives dist; npm run dev installs the existing
+  versioned ZIP with gnome-extensions install --force, without restarting or logs.
   One independent bottom panel is created for each discovered monitor.
   Wayland uses native scaling; X11 geometry uses the monitor geometry_scale.
   BaseSection owns the shared solid surface/frame; BottomPanel owns geometry.
@@ -16,7 +16,7 @@ context: |
   Specifications capture approved behavior, not a claim of runtime verification.
   Preserve existing user changes. Do not use the VM unless the user authorizes it.
   Development tests: npm ci, then npm test (Jasmine suites with GJS API doubles)
-  and npm run test:tooling (disposable build/package/install acceptance).
+  and npm run test:integration (disposable build/package/install acceptance).
   Shell updates require a real restart: Alt+F2 then r on X11, logout/login on
   Wayland. Disable/enable is not sufficient to validate changed module code.
 

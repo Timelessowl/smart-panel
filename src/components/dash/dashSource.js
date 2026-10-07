@@ -2,29 +2,27 @@ import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
 import * as AppFavorites from '@girs/gnome-shell/ui/appFavorites';
 
-import {AppItem} from '@/components/dash/appItem.js';
-import {WindowItem} from '@/components/dash/windowItem.js';
-import * as DashProjection from '@/components/dash/dashProjection.js';
+import {DashLauncher} from '@/components/dash/dashLauncher.js';
 
 const FIXED_APP_IDS = [
     ['firefox.desktop', 'firefox-esr.desktop', 'org.mozilla.firefox.desktop'],
     ['org.gnome.Nautilus.desktop'],
 ];
 
-// One source observes Shell; individual panels only project it for their monitor.
+// Shared Shell state. Queries return native apps/windows; actors and drag order
+// belong to each DashSection and never suspend this source's observations.
 export class DashSource {
     constructor(settings) {
         this._settings = settings;
         this._appSystem = Shell.AppSystem.get_default();
         this._favorites = AppFavorites.getAppFavorites();
         this._tracker = Shell.WindowTracker.get_default();
+        this._launcher = new DashLauncher();
         this._apps = new Map();
         this._windows = new Map();
         this._connections = [];
         this._listeners = new Set();
         this._refreshId = 0;
-        this._pauseCount = 0;
-        this._dirty = false;
         this._connect(this._appSystem, 'installed-changed');
         this._connect(this._appSystem, 'app-state-changed');
         this._connect(this._favorites, 'changed');
@@ -37,8 +35,8 @@ export class DashSource {
         this._refresh();
     }
 
-    _connect(object, signal) {
-        this._connections.push([object, object.connect(signal, () => this._queueRefresh())]);
+    _connect(object, signal, connections = this._connections) {
+        connections.push([object, object.connect(signal, () => this._queueRefresh())]);
     }
 
     subscribe(callback) {
@@ -46,120 +44,125 @@ export class DashSource {
         return () => this._listeners.delete(callback);
     }
 
-    pause() {
-        this._pauseCount++;
+    get perWindow() { return this._state.perWindow; }
+    get monitorOnly() { return this._state.monitorOnly; }
+
+    getFavorites() { return [...this._state.favorites]; }
+    getRunningApps() { return [...this._state.running]; }
+    getOpenedWindows() { return [...this._state.windows]; }
+
+    getOpenMonitorWindows(monitor) {
+        return this._state.windows.filter(window => window.get_monitor() === monitor);
     }
 
-    resume() {
-        this._pauseCount = Math.max(0, this._pauseCount - 1);
-        if (!this._pauseCount && this._dirty)
-            this._queueRefresh();
+    getWindowApp(window) { return this._windows.get(window)?.app ?? null; }
+
+    getAppWindows(app, monitor = null) {
+        return this._state.windows.filter(window => this.getWindowApp(window) === app &&
+            (monitor === null || window.get_monitor() === monitor));
+    }
+
+    isFavorite(appId) {
+        return this._state.favorites.some(app => app.get_id() === appId);
+    }
+
+    isFixedFavorite(appId) { return this._state.fixedIds.has(appId); }
+
+    canSetFavorite(app) {
+        return !this.isFixedFavorite(app.get_id()) && !app.is_window_backed() &&
+            global.settings.is_writable('favorite-apps');
+    }
+
+    setFavorite(app, favorite) {
+        if (!this.canSetFavorite(app))
+            return;
+        if (favorite)
+            this._favorites.addFavorite(app.get_id());
+        else
+            this._favorites.removeFavorite(app.get_id());
+    }
+
+    openNewWindow(app, monitor) {
+        this._launcher.openNewWindow(app, this.monitorOnly ? monitor : null);
+    }
+
+    launchAction(app, action, monitor) {
+        this._launcher.launchAction(app, action, this.monitorOnly ? monitor : null);
     }
 
     _queueRefresh() {
-        this._dirty = true;
-        if (this._refreshId || this._pauseCount)
+        if (this._refreshId)
             return;
         this._refreshId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
             this._refreshId = 0;
-            if (!this._pauseCount)
-                this._refresh();
+            this._refresh();
             return GLib.SOURCE_REMOVE;
         });
     }
 
-    _appItem(app) {
-        let record = this._apps.get(app.get_id());
-        if (record?.item.app !== app) {
-            if (record)
-                this._disconnect(record.connections);
-            const item = new AppItem(app);
-            record = {item, connections: [
-                [app, app.connect('windows-changed', () => this._queueRefresh())],
-                [app, app.connect('notify::state', () => this._queueRefresh())],
-            ]};
-            this._apps.set(item.appId, record);
-        }
-        record.item.refresh();
-        return record.item;
-    }
-
     _refresh() {
-        this._dirty = false;
         const fixedApps = FIXED_APP_IDS.map(ids => ids
             .map(id => this._appSystem.lookup_app(id)).find(Boolean)).filter(Boolean);
-        const hardcodedIds = new Set(fixedApps.map(app => app.get_id()));
+        const fixedIds = new Set(fixedApps.map(app => app.get_id()));
         const favorites = [...fixedApps, ...this._favorites.getFavorites()
-            .filter(app => !hardcodedIds.has(app.get_id()))].map(app => this._appItem(app));
-        const running = this._appSystem.get_running().map(app => this._appItem(app));
-        const activeIds = new Set([...favorites, ...running].map(item => item.appId));
+            .filter(app => !fixedIds.has(app.get_id()))];
+        const running = [...this._appSystem.get_running()];
+        const activeApps = new Set([...favorites, ...running]);
         const activeWindows = new Set();
         const windows = [];
-        for (const appItem of new Set([...favorites, ...running])) {
-            for (const window of appItem.windows) {
+        for (const app of activeApps) {
+            if (!this._apps.has(app)) {
+                const connections = [];
+                this._connect(app, 'windows-changed', connections);
+                this._connect(app, 'notify::state', connections);
+                this._apps.set(app, connections);
+            }
+            for (const window of app.get_windows()) {
                 activeWindows.add(window);
                 let record = this._windows.get(window);
-                if (record && record.item.appItem !== appItem) {
-                    this._disconnect(record.connections);
-                    this._windows.delete(window);
-                    record = null;
-                }
                 if (!record) {
-                    record = {item: new WindowItem(window, appItem), connections: [
-                        [window, window.connect('notify::title', () => this._queueRefresh())],
-                        [window, window.connect('notify::skip-taskbar', () => this._queueRefresh())],
-                        [window, window.connect('unmanaged', () => this._queueRefresh())],
-                    ]};
+                    record = {app, connections: []};
+                    this._connect(window, 'notify::title', record.connections);
+                    this._connect(window, 'notify::skip-taskbar', record.connections);
+                    this._connect(window, 'unmanaged', record.connections);
                     this._windows.set(window, record);
                 }
-                record.item.refresh();
-                if (!record.item.skipTaskbar)
-                    windows.push(record.item);
+                record.app = app;
+                if (!window.skip_taskbar) {
+                    this._launcher.observeWindow(window, app);
+                    windows.push(window);
+                }
             }
         }
-        windows.sort((a, b) => a.stableId - b.stableId);
+        windows.sort((a, b) => a.get_stable_sequence() - b.get_stable_sequence());
         const firstWindowIds = new Map();
-        for (const item of windows) {
-            if (!firstWindowIds.has(item.appId))
-                firstWindowIds.set(item.appId, item.stableId);
+        for (const window of windows) {
+            const app = this.getWindowApp(window);
+            if (!firstWindowIds.has(app))
+                firstWindowIds.set(app, window.get_stable_sequence());
         }
-        // Shell's running order changes with focus; do not let icons jump around.
+        // Shell's running order changes with focus; keep icons in creation order.
         running.sort((a, b) =>
-            (firstWindowIds.get(a.appId) ?? Number.MAX_SAFE_INTEGER) -
-            (firstWindowIds.get(b.appId) ?? Number.MAX_SAFE_INTEGER) ||
-            a.appId.localeCompare(b.appId));
+            (firstWindowIds.get(a) ?? Number.MAX_SAFE_INTEGER) -
+            (firstWindowIds.get(b) ?? Number.MAX_SAFE_INTEGER) ||
+            a.get_id().localeCompare(b.get_id()));
         for (const [window, record] of this._windows) {
             if (!activeWindows.has(window)) {
                 this._disconnect(record.connections);
                 this._windows.delete(window);
             }
         }
-        for (const [id, record] of this._apps) {
-            if (!activeIds.has(id)) {
-                this._disconnect(record.connections);
-                this._apps.delete(id);
+        for (const [app, connections] of this._apps) {
+            if (!activeApps.has(app)) {
+                this._disconnect(connections);
+                this._apps.delete(app);
             }
         }
-        this.perWindow = this._settings.get_boolean('per-window-mode');
-        this.snapshot = {favorites, running, windows, hardcodedIds,
-            perWindow: this.perWindow,
+        this._state = {favorites, running, windows, fixedIds,
+            perWindow: this._settings.get_boolean('per-window-mode'),
             monitorOnly: this._settings.get_boolean('monitor-only')};
         for (const listener of this._listeners)
             listener();
-    }
-
-    project(monitorIndex, orders = {}) {
-        return DashProjection.projectDash({...this.snapshot, monitorIndex, ...orders});
-    }
-
-    setFavorite(item, favorite) {
-        if (this.snapshot.hardcodedIds.has(item.appId) || item.app.is_window_backed() ||
-            !global.settings.is_writable('favorite-apps'))
-            return;
-        if (favorite)
-            this._favorites.addFavorite(item.appId);
-        else
-            this._favorites.removeFavorite(item.appId);
     }
 
     _disconnect(connections) {
@@ -172,8 +175,11 @@ export class DashSource {
             GLib.source_remove(this._refreshId);
         this._refreshId = 0;
         this._listeners.clear();
+        this._launcher.destroy();
         this._disconnect(this._connections);
-        for (const record of [...this._apps.values(), ...this._windows.values()])
+        for (const connections of this._apps.values())
+            this._disconnect(connections);
+        for (const record of this._windows.values())
             this._disconnect(record.connections);
         this._apps.clear();
         this._windows.clear();

@@ -54,7 +54,7 @@ $palettes: (
     }
 
     .bottom-panel-surface.#{$theme} {
-        .dash-app-button:hover,
+        .dash-app-button:hover .dash-hover-highlight,
         .system-section-button:hover,
         .indicator-button:hover {
             background-color: map.get($palette, hover);
@@ -77,7 +77,7 @@ $palettes: (
             color: map.get($palette, text);
         }
 
-        .dash-overflow-button {
+        .dash-overflow-button .dash-hover-highlight {
             background-color: map.get($palette, hover);
         }
 
@@ -111,7 +111,7 @@ $palettes: (
     .dash-expanded.#{$theme} {
         color: map.get($palette, dot);
 
-        .dash-app-button:hover {
+        .dash-app-button:hover .dash-hover-highlight {
             background-color: map.get($palette, hover);
         }
     }

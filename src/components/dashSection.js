@@ -1,15 +1,15 @@
 import Clutter from 'gi://Clutter';
-import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
-import Shell from 'gi://Shell';
 import St from 'gi://St';
-import * as DND from '@girs/gnome-shell/ui/dnd';
 import * as Main from '@girs/gnome-shell/ui/main';
 
 import * as Constants from '@/constant.js';
 import {BaseSection} from '@/components/baseSection.js';
-import {DashIcon} from '@/components/dash/dashIcon.js';
+import {DashIcon, DashButtonContent} from '@/components/dash/dashIcon.js';
 import * as DashLayout from '@/components/dash/dashLayout.js';
+import * as DashProjection from '@/components/dash/dashProjection.js';
+import {DashDragDrop} from '@/components/dash/dashDragDrop.js';
+import * as PopupMenu from '@girs/gnome-shell/ui/popupMenu';
 import * as AppActivation from '@/components/dash/appActivation.js';
 
 // The native frame already provides the outer inset. Only add any
@@ -39,35 +39,35 @@ export class DashSection extends BaseSection {
         this._dismissRegistration = null;
         this._views = new Set();
         this._menuActors = new Set();
-        this._orders = {favoriteOrder: [], runningOrder: []};
         this._activationCycle = null;
-        this._dropId = 0;
-        this._dropPreview = null;
-        this._previewDraggable = null;
-        this._previewDragEndId = 0;
-        this._dropMonitor = {
-            dragMotion: event => {
-                const inside = event.targetActor && (this.contains(event.targetActor) ||
-                    this._expandedSurface?.contains(event.targetActor));
-                if (!inside)
-                    this._clearDropPreview();
-                return DND.DragMotionResult.CONTINUE;
-            },
-            dragDrop: () => {
-                this._clearDropPreview();
-                return DND.DragDropResult.CONTINUE;
-            },
-        };
+        this._menuManager = new PopupMenu.PopupMenuManager(this);
+        this._dragDrop = new DashDragDrop(this, source, themeManager, scaleFactor, () => {
+            if (this.onOrderChanged)
+                this.onOrderChanged();
+            else
+                this.refresh();
+        });
         this._dash = new St.BoxLayout({style_class: 'dash-section',
             style: `padding: 0 ${CONTENT_PADDING}px; spacing: ${Constants.DASH_ITEM_SPACING}px;`});
         this.setSectionContent(this._dash);
         this.refresh();
-        DND.addDragMonitor(this._dropMonitor);
     }
 
     refresh() {
+        if (this._dragDrop.deferRefresh())
+            return;
         this.closeExpanded();
-        this._projection = this._source.project(this._monitorIndex, this._orders);
+        const favorites = this._source.getFavorites();
+        const windows = this._source.monitorOnly
+            ? this._source.getOpenMonitorWindows(this._monitorIndex)
+            : this._source.getOpenedWindows();
+        this._projection = DashProjection.projectDash({favorites, windows,
+            running: this._source.getRunningApps(),
+            windowApps: new Map(windows.map(window => [window, this._source.getWindowApp(window)])),
+            hardcodedIds: new Set(favorites.filter(app => this._source.isFixedFavorite(app.get_id()))
+                .map(app => app.get_id())),
+            perWindow: this._source.perWindow, ...this._dragDrop.orders});
+        this._dragDrop.updateProjection(this._projection);
         this._entries = [...this._projection.favorites, ...this._projection.running];
         this._rebuildCollapsed();
     }
@@ -75,9 +75,11 @@ export class DashSection extends BaseSection {
     setAvailableSize(width, maxExpansionHeight) {
         if (width === this._availableWidth && maxExpansionHeight === this._maxExpansionHeight)
             return;
-        this.closeExpanded();
         this._availableWidth = width;
         this._maxExpansionHeight = Math.max(this._scale(Constants.SECTION_HEIGHT), maxExpansionHeight);
+        if (this._dragDrop.deferRefresh())
+            return;
+        this.closeExpanded();
         this._rebuildCollapsed();
     }
 
@@ -89,7 +91,7 @@ export class DashSection extends BaseSection {
         const height = this._scale(Constants.SECTION_HEIGHT - Constants.DASH_BORDER_WIDTH * 2);
         for (const token of this._layout.tokens)
             this._dash.add_child(this._createToken(token, height));
-        this._makeDropZone(this._dash);
+        this._dragDrop.addDropZone(this._dash);
         this._dash.queue_relayout();
     }
 
@@ -98,7 +100,8 @@ export class DashSection extends BaseSection {
         if (token.type === 'launchpad') {
             const button = new St.Button({style_class: 'dash-app-button dash-launchpad',
                 accessible_name: 'Toggle overview', can_focus: true, width, height,
-                child: new St.Icon({icon_name: 'view-app-grid-symbolic', icon_size: Constants.DASH_ICON_SIZE})});
+                child: new DashButtonContent(new St.Icon({icon_name: 'view-app-grid-symbolic',
+                    icon_size: Constants.DASH_ICON_SIZE}))});
             button.connect('clicked', () => {
                 this._activationCycle = null;
                 this.closeExpanded();
@@ -114,16 +117,19 @@ export class DashSection extends BaseSection {
                     width: this._scale(1), x_align: Clutter.ActorAlign.CENTER, y_expand: true})});
         }
         if (token.type === 'overflow') {
-            const button = new St.Button({label: `+${token.hiddenCount}`, width, height,
+            const button = new St.Button({width, height,
+                child: new DashButtonContent(new St.Label({text: `+${token.hiddenCount}`})),
                 style_class: 'dash-app-button dash-overflow-button', can_focus: true,
                 accessible_name: `Show ${token.hiddenCount} more apps or windows`});
             button.connect('clicked', () => this._openExpanded());
             return button;
         }
         const view = new DashIcon(token.entry, this, this._layout.iconSize, width, height);
+        this._dragDrop.attachIcon(view);
+        this._menuManager.addMenu(/** @type {PopupMenu.PopupMenu} */ (view.menu));
         this._views.add(view);
         view.connect('destroy', () => this._views.delete(view));
-        return view;
+        return view.container;
     }
 
     _scale(value) {
@@ -136,7 +142,7 @@ export class DashSection extends BaseSection {
         const inset = this._scale(CONTENT_INSET);
         const rows = DashLayout.expandedRows(this._entries, this._layout.iconSize,
             this._availableWidth - inset * 2, this._scaleFactor);
-        const rowHeight = this._scale(Constants.DASH_ICON_SIZE + Constants.DASH_ITEM_INSET);
+        const rowHeight = this._scale(Constants.DASH_EXPANDED_ROW_HEIGHT);
         const spacing = this._scale(Constants.DASH_ITEM_SPACING);
         const gridWidth = Math.max(...rows.map(row => DashLayout.tokensWidth(row, this._scaleFactor)));
         const gridHeight = rows.length * rowHeight + (rows.length - 1) * spacing;
@@ -162,7 +168,7 @@ export class DashSection extends BaseSection {
         this._expandedSurface = new BaseSection();
         this._expandedSurface.add_style_class_name('dash-expanded');
         this._expandedSurface.setSectionContent(scroll);
-        this._makeDropZone(grid, this._expandedSurface);
+        this._dragDrop.addDropZone(grid, this._expandedSurface);
         const surfaceHeight = Math.min(gridHeight + inset * 2, this._maxExpansionHeight);
         this._expandedSurface.set_size(Math.min(this._availableWidth, gridWidth + inset * 2),
             surfaceHeight);
@@ -175,10 +181,11 @@ export class DashSection extends BaseSection {
         });
         this._dismissRegistration = this._transientInputManager.register(
             this._expandedSurface, () => this.closeExpanded(), this._menuActors);
+        this._dragDrop.setExpandedSurface(this._expandedSurface, this._dismissRegistration);
     }
 
     closeExpanded() {
-        this._clearDropPreview();
+        this._dragDrop.setExpandedSurface(null);
         if (!this._expandedSurface)
             return;
         this._transientInputManager.unregister(this._dismissRegistration);
@@ -191,32 +198,52 @@ export class DashSection extends BaseSection {
     }
 
     activateEntry(entry) {
+        // Query current state at click time, including any changes since the
+        // icon was drawn. Focus/minimize and indicators use the same scope.
+        const windows = this._source.getAppWindows(entry.item.app,
+            this._source.monitorOnly ? this._monitorIndex : null);
         if (this._source.perWindow) {
             this._activationCycle = null;
-            const window = entry.representedWindow?.window;
-            if (window)
+            const window = entry.representedWindow;
+            if (window && windows.includes(window))
                 Main.activateWindow(window);
+            else if (windows.length && entry.group === 'favorites')
+                Main.activateWindow(windows[0]);
             else
-                entry.item.app.open_new_window(-1);
+                this.openNewWindow(entry.item.app);
         } else {
-            const {action, cycle} = AppActivation.nextAppAction(this._activationCycle, entry);
+            const {action, cycle} = AppActivation.nextAppAction(this._activationCycle, {...entry, windows});
             this._activationCycle = cycle;
             if (action.type === 'focus')
-                Main.activateWindow(action.window.window);
+                Main.activateWindow(action.window);
             else if (action.type === 'minimize')
-                action.windows.forEach(item => item.window.minimize());
+                action.windows.forEach(window => window.minimize());
             else
-                entry.item.app.open_new_window(-1);
+                this.openNewWindow(entry.item.app);
         }
         this.closeExpanded();
     }
 
     isFavorite(appId) {
-        return this._source.snapshot.favorites.some(item => item.appId === appId);
+        return this._source.isFavorite(appId);
     }
 
-    setFavorite(item, favorite) {
-        this._source.setFavorite(item, favorite);
+    setFavorite(app, favorite) {
+        this._source.setFavorite(app, favorite);
+    }
+
+    canSetFavorite(app) {
+        return this._source.canSetFavorite(app);
+    }
+
+    openNewWindow(app) {
+        this._source.openNewWindow(app, this._monitorIndex);
+        this.closeExpanded();
+    }
+
+    launchAction(app, action) {
+        this._source.launchAction(app, action, this._monitorIndex);
+        this.closeExpanded();
     }
 
     menuChanged(actor, open) {
@@ -226,169 +253,8 @@ export class DashSection extends BaseSection {
             this._menuActors.delete(actor);
     }
 
-    dragStarted() {
-        this._source.pause();
-        if (this._dismissRegistration)
-            this._dismissRegistration.paused = true;
-    }
-
-    dragEnded() {
-        this._source.resume();
-        this._clearDropPreview();
-        if (this._dismissRegistration)
-            this._dismissRegistration.paused = false;
-    }
-
-    /**
-     * Shell DND attaches delegates to the participating actors.
-     * @param {St.Widget & {_delegate?: object}} actor
-     * @param {BaseSection & {_delegate?: object}} [surface]
-     */
-    _makeDropZone(actor, surface = this) {
-        const targetAt = (x, y) => {
-            const icons = actor.get_children().filter(child => child instanceof DashIcon);
-            return icons.sort((a, b) =>
-                Math.hypot(a.x + a.width / 2 - x, a.y + a.height / 2 - y) -
-                Math.hypot(b.x + b.width / 2 - x, b.y + b.height / 2 - y))[0];
-        };
-        const delegateFor = container => {
-            const pickTarget = (x, y) => {
-                if (container !== actor) {
-                    const [stageX, stageY] = container.get_transformed_position();
-                    const [stageWidth, stageHeight] = container.get_transformed_size();
-                    const [ok, actorX, actorY] = actor.transform_stage_point(
-                        stageX + x * stageWidth / container.width,
-                        stageY + y * stageHeight / container.height);
-                    if (!ok)
-                        return null;
-                    x = actorX;
-                    y = actorY;
-                }
-                const target = targetAt(x, y);
-                return target ? {target, after: x > target.x + target.width / 2} : null;
-            };
-            return {
-                handleDragOver: (source, _dragActor, x, y) => {
-                    const hit = pickTarget(x, y);
-                    if (!hit) {
-                        this._clearDropPreview();
-                        return DND.DragMotionResult.NO_DROP;
-                    }
-                    return this.dragOver(source, hit.target.entry, hit.after, hit.target);
-                },
-                acceptDrop: (source, _dragActor, x, y) => {
-                    const hit = pickTarget(x, y);
-                    return hit ? this.drop(source, hit.target.entry, hit.after) : false;
-                },
-            };
-        };
-        actor._delegate = delegateFor(actor);
-        // Border/padding picks still reach a delegate, even without an icon hit.
-        surface._delegate = delegateFor(surface);
-    }
-
-    _canDrop(source, target, after) {
-        const entry = source instanceof DashIcon ? source.entry : null;
-        if (!entry || (entry.group === 'favorites' && entry.hardcoded))
-            return false;
-        if (target.group === 'running')
-            return entry.group === 'running';
-        if (entry.hardcoded || entry.item.app.is_window_backed() ||
-            (!this.isFavorite(entry.item.appId) && !global.settings.is_writable('favorite-apps')))
-            return false;
-        const fixed = this._projection.favorites.filter(item => item.hardcoded);
-        return !target.hardcoded || (after && target === fixed.at(-1));
-    }
-
-    dragOver(source, target, after, targetView) {
-        if (!this._canDrop(source, target, after)) {
-            this._clearDropPreview();
-            return DND.DragMotionResult.NO_DROP;
-        }
-        this._showDropPreview(source, targetView, after);
-        return DND.DragMotionResult.MOVE_DROP;
-    }
-
-    _showDropPreview(source, targetView, after) {
-        if (this._previewDraggable !== source._draggable)
-            this._clearDropPreview();
-        const size = this._scale(Constants.DASH_DROP_PREVIEW_SIZE);
-        if (!this._dropPreview) {
-            this._dropPreview = new St.Bin({
-                style_class: 'dash-drop-preview', width: size, height: size,
-                opacity: Constants.DASH_DROP_PREVIEW_OPACITY, reactive: false,
-                child: source.item.createIcon(Constants.DASH_DROP_PREVIEW_SIZE),
-            });
-            Shell.util_set_hidden_from_pick(this._dropPreview, true);
-            this._themeManager.addActor(this._dropPreview);
-            Main.layoutManager.addTopChrome(this._dropPreview, {
-                affectsInputRegion: false, affectsStruts: false, trackFullscreen: true,
-            });
-            this._previewDraggable = source._draggable;
-            this._previewDragEndId = this._previewDraggable.connect('drag-end', () =>
-                this._clearDropPreview());
-        }
-        const surface = this._expandedSurface?.contains(targetView)
-            ? this._expandedSurface : this;
-        const [surfaceX, surfaceY] = surface.get_transformed_position();
-        const [surfaceWidth, surfaceHeight] = surface.get_transformed_size();
-        const [x, y] = targetView.get_transformed_position();
-        const [width, height] = targetView.get_transformed_size();
-        const spacing = this._scale(Constants.DASH_ITEM_SPACING);
-        const insertionX = after ? x + width + spacing / 2 : x - spacing / 2;
-        this._dropPreview.set_position(
-            Math.round(Math.max(surfaceX, Math.min(insertionX - size / 2,
-                surfaceX + surfaceWidth - size))),
-            Math.round(Math.max(surfaceY, Math.min(y + (height - size) / 2,
-                surfaceY + surfaceHeight - size))));
-    }
-
-    _clearDropPreview() {
-        if (this._previewDragEndId)
-            this._previewDraggable.disconnect(this._previewDragEndId);
-        this._previewDragEndId = 0;
-        this._previewDraggable = null;
-        if (this._dropPreview) {
-            this._themeManager.removeActor(this._dropPreview);
-            Main.layoutManager.removeChrome(this._dropPreview);
-            this._dropPreview.destroy();
-            this._dropPreview = null;
-        }
-    }
-
-    drop(source, target, after) {
-        this._clearDropPreview();
-        if (this._dropId || !this._canDrop(source, target, after))
-            return false;
-        const entry = source.entry;
-        // DND must finish releasing its actors before any icon is rebuilt.
-        this._dropId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
-            this._dropId = 0;
-            const favorites = target.group === 'favorites';
-            const entries = this._projection[target.group];
-            const key = item => favorites ? item.item.appId : item.item.id;
-            const order = entries.map(key);
-            const sourceKey = key(entry);
-            const targetKey = key(target);
-            if (sourceKey !== targetKey) {
-                const remaining = order.filter(id => id !== sourceKey);
-                remaining.splice(remaining.indexOf(targetKey) + (after ? 1 : 0), 0, sourceKey);
-                this._orders[favorites ? 'favoriteOrder' : 'runningOrder'] = remaining;
-            }
-            if (favorites && !this.isFavorite(entry.item.appId))
-                this.setFavorite(entry.item, true);
-            else
-                this.onOrderChanged?.();
-            return GLib.SOURCE_REMOVE;
-        });
-        return true;
-    }
-
     destroy() {
-        DND.removeDragMonitor(this._dropMonitor);
-        if (this._dropId)
-            GLib.source_remove(this._dropId);
-        this._dropId = 0;
+        this._dragDrop.destroy();
         this.closeExpanded();
         super.destroy();
         this._source = null;

@@ -13,6 +13,10 @@ const CORNERS = [
 const DECLARATIONS = `
 uniform float width;
 uniform float height;
+uniform float texture_width;
+uniform float texture_height;
+uniform float offset_x;
+uniform float offset_y;
 uniform float radius_tl;
 uniform float radius_tr;
 uniform float radius_br;
@@ -21,7 +25,10 @@ uniform float pixel_size;
 `;
 const MASK = `
 vec2 size = vec2(width, height);
-vec2 p = cogl_tex_coord_in[0].st * size;
+// UVs cover Clutter's padded FBO, not the actor allocation. Convert back to
+// actor coordinates before measuring distance to its CSS outline.
+vec2 p = cogl_tex_coord_in[0].st * vec2(texture_width, texture_height) * pixel_size
+    + vec2(offset_x, offset_y);
 float r;
 if (p.y < height * 0.5)
     r = p.x < width * 0.5 ? radius_tl : radius_tr;
@@ -35,6 +42,25 @@ const FILL = {
     x_expand: true, y_expand: true,
     x_align: Clutter.ActorAlign.FILL, y_align: Clutter.ActorAlign.FILL,
 };
+
+// Match ClutterOffscreenEffect's local FBO origin. Clutter rounds the paint
+// volume and pads it asymmetrically (normally 2px before, 1px after), then
+// scales the buffer. Deriving an origin from half the extra texture size would
+// shift the mask, especially for fractional allocations or a non-zero volume.
+// Adapted from Mutter 6145511b9b0f9b597b620d869855bfe61d045c96,
+// clutter-actor-box.c / clutter-offscreen-effect.c (LGPL-2.1-or-later).
+function offscreenOrigin(actor) {
+    const volume = actor.get_paint_volume();
+    const origin = volume?.get_origin();
+    const box = volume ? null : actor.get_allocation_box();
+    const x = origin?.x ?? box.x1;
+    const y = origin?.y ?? box.y1;
+    const width = volume ? volume.get_width() : box.get_width();
+    const height = volume ? volume.get_height() : box.get_height();
+    const offset = (start, length) => Math.trunc(
+        Math.ceil(start + length + 0.75) - Math.round(length) - 3 - (volume ? 0 : start));
+    return [offset(x, width), offset(y, height)];
+}
 
 class LiveActorBlur extends Shell.BlurEffect {
     static {
@@ -56,7 +82,8 @@ class RoundedMaskEffect extends Shell.GLSLEffect {
     constructor() {
         super();
         this.styleSource = null;
-        this._uniforms = Object.fromEntries(['width', 'height', 'pixel_size', ...CORNERS.map(([name]) => name)]
+        this._uniforms = Object.fromEntries(['width', 'height', 'texture_width', 'texture_height',
+            'offset_x', 'offset_y', 'pixel_size', ...CORNERS.map(([name]) => name)]
             .map(name => [name, this.get_uniform_location(name)]));
     }
 
@@ -77,7 +104,12 @@ class RoundedMaskEffect extends Shell.GLSLEffect {
         const uniform = (name, value) => this.set_uniform_float(this._uniforms[name], 1, [value]);
         uniform('width', width);
         uniform('height', height);
-        uniform('pixel_size', Math.max(width / texture.get_width(), height / texture.get_height()));
+        uniform('texture_width', texture.get_width());
+        uniform('texture_height', texture.get_height());
+        const [offsetX, offsetY] = offscreenOrigin(actor);
+        uniform('offset_x', offsetX);
+        uniform('offset_y', offsetY);
+        uniform('pixel_size', 1 / actor.get_resource_scale());
         const theme = (this.styleSource ?? actor).get_theme_node();
         for (const [name, corner] of CORNERS)
             uniform(name, Math.max(0, Math.min(theme.get_border_radius(corner), width / 2, height / 2)));
