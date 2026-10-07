@@ -3,10 +3,10 @@ import Gio from 'gi://Gio';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
 
-import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
+import * as Main from '@girs/gnome-shell/ui/main';
+import * as PopupMenu from '@girs/gnome-shell/ui/popupMenu';
 
-import {BaseSection} from './baseSection.js';
+import {BaseSection} from '@/components/baseSection.js';
 
 export class DebianButton extends BaseSection {
     static {

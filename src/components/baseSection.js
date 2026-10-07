@@ -1,10 +1,10 @@
-import Clutter from "gi://Clutter";
-import GObject from "gi://GObject";
-import St from "gi://St";
-import Shell from "gi://Shell";
-import { RoundedBackgroundBlur } from "../externals/roundedBackgroundBlur.js";
+import Clutter from 'gi://Clutter';
+import GObject from 'gi://GObject';
+import St from 'gi://St';
+import Shell from 'gi://Shell';
+import { RoundedBackgroundBlur } from '@/externals/roundedBackgroundBlur.js';
 
-import { SECTION_BORDER_WIDTH, SECTION_FRAME_WIDTH } from "../constant.js";
+import * as Constants from '@/constant.js';
 
 export class BaseSection extends St.Widget {
   static {
@@ -24,7 +24,7 @@ export class BaseSection extends St.Widget {
     // its opaque child inside the band, rather than underneath an overlay.
     this._frame = new St.Bin({
       style_class: "panel-section-frame",
-      style: `padding: ${SECTION_FRAME_WIDTH}px; border-width: ${SECTION_BORDER_WIDTH}px;`,
+      style: `padding: ${Constants.SECTION_FRAME_WIDTH}px; border-width: ${Constants.SECTION_BORDER_WIDTH}px;`,
       x_expand: true,
       y_expand: true,
       x_align: Clutter.ActorAlign.FILL,

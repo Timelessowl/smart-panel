@@ -1,4 +1,5 @@
-import {loadGjsModule, SignalObject} from './gjsHarness.mjs';
+import * as GjsHarness from '#tests/gjsHarness.mjs';
+import {SignalObject} from '#tests/gjsHarness.mjs';
 
 async function fixture() {
     let pointer = [0, 0, 0];
@@ -22,8 +23,8 @@ async function fixture() {
             allowKeybinding: (binding, mode) => permissions.push([binding, mode]),
         }},
     };
-    const {TransientInputManager} = await loadGjsModule(
-        new URL('../transientInputManager.js', import.meta.url), imports,
+    const {TransientInputManager} = await GjsHarness.loadGjsModule(
+        new URL('../src/transientInputManager.js', import.meta.url), imports,
         {global: {display, get_pointer: () => pointer}});
     return {manager: new TransientInputManager(), display, permissions, ungrabbed,
         click(x, y) { pointer = [x, y, 0]; poll(); pointer = [x, y, 1]; return poll(); }};

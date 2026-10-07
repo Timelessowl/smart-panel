@@ -1,32 +1,32 @@
-import {cp, lstat, mkdir, mkdtemp, rename, rm} from 'node:fs/promises';
-import {homedir} from 'node:os';
-import {dirname, join, resolve} from 'node:path';
-import {parseArgs} from 'node:util';
-import {canonicalPath, distDirectory, listFiles, readBuild} from './shared.mjs';
+import * as Files from 'node:fs/promises';
+import * as OS from 'node:os';
+import * as Path from 'node:path';
+import * as Util from 'node:util';
+import * as Build from '#scripts/shared.mjs';
 
 try {
-    const {values} = parseArgs({options: {dest: {type: 'string'}}});
-    const metadata = await readBuild(distDirectory);
-    await listFiles(distDirectory); // Reject symlinks before copying the build.
-    const dataDirectory = process.env.XDG_DATA_HOME || join(homedir(), '.local/share');
-    const destination = values.dest ? resolve(values.dest)
-        : join(dataDirectory, 'gnome-shell/extensions', metadata.uuid);
-    const targetPath = await canonicalPath(destination);
-    const buildPath = await canonicalPath(distDirectory);
+    const {values} = Util.parseArgs({options: {dest: {type: 'string'}}});
+    const metadata = await Build.readBuild(Build.distDirectory);
+    await Build.listFiles(Build.distDirectory); // Reject symlinks before copying the build.
+    const dataDirectory = process.env.XDG_DATA_HOME || Path.join(OS.homedir(), '.local/share');
+    const destination = values.dest ? Path.resolve(values.dest)
+        : Path.join(dataDirectory, 'gnome-shell/extensions', metadata.uuid);
+    const targetPath = await Build.canonicalPath(destination);
+    const buildPath = await Build.canonicalPath(Build.distDirectory);
     if (targetPath === buildPath || buildPath.startsWith(`${targetPath}/`)
-        || targetPath.startsWith(`${buildPath}/`) || targetPath === resolve('/'))
+        || targetPath.startsWith(`${buildPath}/`) || targetPath === Path.resolve('/'))
         throw new Error('Installation destination must be separate from the build directory.');
 
-    await mkdir(dirname(destination), {recursive: true});
-    const staging = await mkdtemp(join(dirname(destination), `.${metadata.uuid}-`));
-    const replacement = join(staging, 'extension');
-    const backup = join(staging, 'previous');
+    await Files.mkdir(Path.dirname(destination), {recursive: true});
+    const staging = await Files.mkdtemp(Path.join(Path.dirname(destination), `.${metadata.uuid}-`));
+    const replacement = Path.join(staging, 'extension');
+    const backup = Path.join(staging, 'previous');
     let previousExists = false;
     let backupNeedsRecovery = false;
     try {
-        await cp(distDirectory, replacement, {recursive: true});
+        await Files.cp(Build.distDirectory, replacement, {recursive: true});
         try {
-            const previous = await lstat(destination);
+            const previous = await Files.lstat(destination);
             if (!previous.isDirectory() || previous.isSymbolicLink())
                 throw new Error('Installation destination must be a directory, not a symlink.');
             previousExists = true;
@@ -35,15 +35,15 @@ try {
                 throw error;
         }
         if (previousExists) {
-            await rename(destination, backup);
+            await Files.rename(destination, backup);
             backupNeedsRecovery = true;
         }
         try {
-            await rename(replacement, destination);
+            await Files.rename(replacement, destination);
             backupNeedsRecovery = false;
         } catch (error) {
             if (previousExists) {
-                await rename(backup, destination);
+                await Files.rename(backup, destination);
                 backupNeedsRecovery = false;
             }
             throw error;
@@ -52,7 +52,7 @@ try {
         if (backupNeedsRecovery)
             console.error(`Previous installation preserved at ${backup}`);
         else
-            await rm(staging, {recursive: true, force: true});
+            await Files.rm(staging, {recursive: true, force: true});
     }
     console.log(`Installed ${metadata.uuid} to ${destination}`);
     console.log(`Enable: gnome-extensions enable ${metadata.uuid}`);

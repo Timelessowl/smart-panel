@@ -1,9 +1,9 @@
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
-import * as DND from 'resource:///org/gnome/shell/ui/dnd.js';
-import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
+import * as DND from '@girs/gnome-shell/ui/dnd';
+import * as Main from '@girs/gnome-shell/ui/main';
+import * as PopupMenu from '@girs/gnome-shell/ui/popupMenu';
 
 // Indicators are an overlay, not part of the icon's size request. Allocate them
 // relative to the actual icon texture, regardless of the button's row height.
@@ -103,12 +103,14 @@ export class DashIcon extends St.Button {
             this._draggable.connect('drag-begin', () => {
                 this._dragging = true;
                 owner.dragStarted();
+                return false;
             });
             this._draggable.connect('drag-end', () => {
                 if (this._dragging) {
                     this._dragging = false;
                     owner.dragEnded();
                 }
+                return false;
             });
         }
         // Also runs for native parent destruction, not only explicit JS destroy().

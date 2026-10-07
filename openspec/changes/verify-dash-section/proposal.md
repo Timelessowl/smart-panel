@@ -24,7 +24,7 @@ requirements. `.openspec.yaml` sets `skip_specs: true`; no delta spec is needed.
 
 ## Impact
 
-components/dashSection.js, components/dash/*, prefs.js, the extension schema, transientInputManager.js, and tests. No stub controls or new application-discovery policy.
+src/components/dashSection.js, src/components/dash/*, src/prefs.js, the extension schema, src/transientInputManager.js, and tests. No stub controls or new application-discovery policy.
 
 This is a planning artifact only. Creating this change does not implement its
 unchecked tasks or establish native Shell acceptance.

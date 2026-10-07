@@ -24,7 +24,7 @@ requirements. `.openspec.yaml` sets `skip_specs: true`; no delta spec is needed.
 
 ## Impact
 
-components/indicatorSection.js, BottomPanel.setIndicators, MonitorManager.setIndicators, and indicator tests. Production startup continues to supply an empty set.
+src/components/indicatorSection.js, BottomPanel.setIndicators, MonitorManager.setIndicators, and indicator tests. Production startup continues to supply an empty set.
 
 This is a planning artifact only. Creating this change does not implement its
 unchecked tasks or establish native Shell acceptance.

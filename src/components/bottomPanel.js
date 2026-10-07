@@ -3,30 +3,15 @@ import GObject from 'gi://GObject';
 import Meta from 'gi://Meta';
 import St from 'gi://St';
 
-import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as Main from '@girs/gnome-shell/ui/main';
 
-import {DashSection} from './dashSection.js';
-import {DebianButton} from './debianButton.js';
-import {IndicatorSection} from './indicatorSection.js';
-import {SearchSection} from './searchSection.js';
-import {SystemSection} from './systemSection.js';
+import {DashSection} from '@/components/dashSection.js';
+import {DebianButton} from '@/components/debianButton.js';
+import {IndicatorSection} from '@/components/indicatorSection.js';
+import {SearchSection} from '@/components/searchSection.js';
+import {SystemSection} from '@/components/systemSection.js';
 
-import {
-    DASH_EXPANSION_TOP_MARGIN,
-    END_SECTION_GAP,
-    PANEL_BOTTOM_PADDING,
-    PANEL_HEIGHT,
-    PANEL_HORIZONTAL_PADDING,
-    PANEL_TOP_PADDING,
-    SEARCH_CLEARANCE,
-    SEARCH_MAX_WIDTH,
-    SEARCH_WIDTH_RATIO,
-    SECTION_BORDER_WIDTH,
-    SECTION_FRAME_WIDTH,
-    SECTION_HEIGHT,
-    START_SECTION_GAP,
-    SYSTEM_WIDTH,
-} from '../constant.js';
+import * as Constants from '@/constant.js';
 
 export class BottomPanel extends St.Widget {
     static {
@@ -93,24 +78,24 @@ export class BottomPanel extends St.Widget {
 
     _updateGeometry() {
         const monitor = this._monitor;
-        const panelHeight = this._scale(PANEL_HEIGHT);
-        const sectionHeight = this._scale(SECTION_HEIGHT +
-            (SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH) * 2);
-        const horizontalPadding = this._scale(PANEL_HORIZONTAL_PADDING);
-        const topPadding = this._scale(PANEL_TOP_PADDING);
-        const bottomPadding = this._scale(PANEL_BOTTOM_PADDING);
+        const panelHeight = this._scale(Constants.PANEL_HEIGHT);
+        const sectionHeight = this._scale(Constants.SECTION_HEIGHT +
+            (Constants.SECTION_FRAME_WIDTH + Constants.SECTION_BORDER_WIDTH) * 2);
+        const horizontalPadding = this._scale(Constants.PANEL_HORIZONTAL_PADDING);
+        const topPadding = this._scale(Constants.PANEL_TOP_PADDING);
+        const bottomPadding = this._scale(Constants.PANEL_BOTTOM_PADDING);
 
         const panelWidth = monitor.width;
         const searchWidth = Math.min(
-            this._scale(SEARCH_MAX_WIDTH),
-            Math.round(panelWidth * SEARCH_WIDTH_RATIO)
+            this._scale(Constants.SEARCH_MAX_WIDTH),
+            Math.round(panelWidth * Constants.SEARCH_WIDTH_RATIO)
         );
         const searchX = Math.round((panelWidth - searchWidth) / 2);
         const dashStart = horizontalPadding + sectionHeight +
-            this._scale(START_SECTION_GAP);
+            this._scale(Constants.START_SECTION_GAP);
         const dashMaxWidth = Math.max(
             0,
-            searchX - this._scale(SEARCH_CLEARANCE) - dashStart
+            searchX - this._scale(Constants.SEARCH_CLEARANCE) - dashStart
         );
 
         this.set_size(panelWidth, panelHeight);
@@ -122,7 +107,7 @@ export class BottomPanel extends St.Widget {
         this._dashSection.setAvailableSize(
             dashMaxWidth,
             monitor.height - bottomPadding -
-                this._scale(DASH_EXPANSION_TOP_MARGIN)
+                this._scale(Constants.DASH_EXPANSION_TOP_MARGIN)
         );
         const dashWidth = Math.min(
             dashMaxWidth,
@@ -153,7 +138,7 @@ export class BottomPanel extends St.Widget {
         this._placeFromEnd(
             this._indicatorSection,
             horizontalPadding +
-                this._scale(SYSTEM_WIDTH + END_SECTION_GAP),
+                this._scale(Constants.SYSTEM_WIDTH + Constants.END_SECTION_GAP),
             topPadding,
             this._scale(this._indicatorSection.preferredWidth),
             sectionHeight
@@ -162,7 +147,7 @@ export class BottomPanel extends St.Widget {
             this._systemSection,
             horizontalPadding,
             topPadding,
-            this._scale(SYSTEM_WIDTH),
+            this._scale(Constants.SYSTEM_WIDTH),
             sectionHeight
         );
     }

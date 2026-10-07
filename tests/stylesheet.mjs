@@ -1,4 +1,4 @@
-import {compile} from 'sass';
-import {fileURLToPath} from 'node:url';
+import * as Sass from 'sass';
+import * as Url from 'node:url';
 
-export const stylesheet = compile(fileURLToPath(new URL('../style/stylesheet.scss', import.meta.url))).css;
+export const stylesheet = Sass.compile(Url.fileURLToPath(new URL('../src/style/stylesheet.scss', import.meta.url))).css;

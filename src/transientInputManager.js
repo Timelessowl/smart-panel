@@ -2,7 +2,7 @@ import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
-import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as Main from '@girs/gnome-shell/ui/main';
 
 const POINTER_POLL_INTERVAL = 16;
 const POINTER_BUTTON_MASK =

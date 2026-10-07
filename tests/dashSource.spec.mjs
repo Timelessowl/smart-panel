@@ -1,4 +1,5 @@
-import {loadGjsModule, SignalObject} from './gjsHarness.mjs';
+import * as GjsHarness from '#tests/gjsHarness.mjs';
+import {SignalObject} from '#tests/gjsHarness.mjs';
 
 async function fixture() {
     const sources = new Map();
@@ -59,7 +60,7 @@ async function fixture() {
             WindowTracker: {get_default: () => tracker}}},
         'resource:///org/gnome/shell/ui/appFavorites.js': {getAppFavorites: () => favorites},
     };
-    const {DashSource} = await loadGjsModule(new URL('../components/dash/dashSource.js', import.meta.url),
+    const {DashSource} = await GjsHarness.loadGjsModule(new URL('../src/components/dash/dashSource.js', import.meta.url),
         imports, {global: {display, settings: {is_writable: () => true}}});
     const source = new DashSource(settings);
     const makeWindow = (app, stableId, monitor = 0) => {

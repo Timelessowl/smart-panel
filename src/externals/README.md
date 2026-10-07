@@ -15,5 +15,5 @@ with local GNOME 48.7 compatibility choices and regression tests in
 upstream code; identify its source revision, license, and local changes.
 
 Just Perfection's API has been reviewed in
-[the API assessment](../docs/just-perfection-api-review.md). It is not included as
+[the API assessment](../../docs/just-perfection-api-review.md). It is not included as
 a runtime module.

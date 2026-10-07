@@ -1,11 +1,11 @@
-import {rollup} from 'rollup';
-import config from '../rollup.config.mjs';
+import * as Rollup from 'rollup';
+import * as RollupConfig from '#rollup';
 
 try {
-    const bundle = await rollup(config);
+    const bundle = await Rollup.rollup(RollupConfig.default);
     try {
-        await bundle.write(config.output);
-        console.log(`Built extension in ${config.output.dir}`);
+        await bundle.write(RollupConfig.default.output);
+        console.log(`Built extension in ${RollupConfig.default.output.dir}`);
     } finally {
         await bundle.close();
     }

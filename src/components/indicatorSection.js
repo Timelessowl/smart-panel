@@ -2,17 +2,11 @@ import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
 
-import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
+import * as Main from '@girs/gnome-shell/ui/main';
+import * as PopupMenu from '@girs/gnome-shell/ui/popupMenu';
 
-import {
-    INDICATOR_ICON_SIZE,
-    INDICATOR_ITEM_SIZE,
-    INDICATOR_ITEM_SPACING,
-    INDICATOR_MIN_WIDTH,
-    INDICATOR_WIDTH_STEP,
-} from '../constant.js';
-import {BaseSection} from './baseSection.js';
+import * as Constants from '@/constant.js';
+import {BaseSection} from '@/components/baseSection.js';
 
 export class IndicatorSection extends BaseSection {
     static {
@@ -39,7 +33,7 @@ export class IndicatorSection extends BaseSection {
         this._indicatorBox = new St.BoxLayout({
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.CENTER,
-            style: `spacing: ${INDICATOR_ITEM_SPACING}px;`,
+            style: `spacing: ${Constants.INDICATOR_ITEM_SPACING}px;`,
         });
         content.add_child(this._indicatorBox);
 
@@ -52,8 +46,8 @@ export class IndicatorSection extends BaseSection {
 
         this.hasIndicators = this._indicators.length > 0;
         this.preferredWidth = this.hasIndicators
-            ? INDICATOR_MIN_WIDTH +
-                (this._indicators.length - 1) * INDICATOR_WIDTH_STEP
+            ? Constants.INDICATOR_MIN_WIDTH +
+                (this._indicators.length - 1) * Constants.INDICATOR_WIDTH_STEP
             : 0;
 
         for (const indicator of this._indicators)
@@ -69,10 +63,10 @@ export class IndicatorSection extends BaseSection {
             y_align: Clutter.ActorAlign.CENTER,
             child: new St.Icon({
                 icon_name: iconName,
-                icon_size: INDICATOR_ICON_SIZE,
+                icon_size: Constants.INDICATOR_ICON_SIZE,
             }),
         });
-        const itemSize = Math.round(INDICATOR_ITEM_SIZE * this._scaleFactor);
+        const itemSize = Math.round(Constants.INDICATOR_ITEM_SIZE * this._scaleFactor);
         button.set_size(itemSize, itemSize);
 
         const menu = new PopupMenu.PopupMenu(button, 0.5, St.Side.BOTTOM);

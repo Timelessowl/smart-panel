@@ -1,7 +1,9 @@
-import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
+import '@/style/stylesheet.scss';
 
-import {MonitorManager} from './monitorManager.js';
-import {DashSource} from './components/dash/dashSource.js';
+import {Extension} from '@girs/gnome-shell/extensions/extension';
+
+import {MonitorManager} from '@/monitorManager.js';
+import {DashSource} from '@/components/dash/dashSource.js';
 
 export default class SimpleBottomPanelExtension extends Extension {
     enable() {

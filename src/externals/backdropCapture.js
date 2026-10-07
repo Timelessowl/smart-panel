@@ -101,6 +101,7 @@ class BackdropContent extends GObject.Object {
         const color = new Cogl.Color();
         color.init_from_4f(opacity, opacity, opacity, opacity);
         target.pipeline.set_color(color);
+        // @ts-expect-error GIR omits GJS's boxed constructor; it only declares PipelineNode.new().
         const texture = new Clutter.PipelineNode(target.pipeline);
         texture.add_rectangle(new Clutter.ActorBox({x1: 0, y1: 0, x2: actor.width, y2: actor.height}));
         node.add_child(texture);
@@ -187,6 +188,7 @@ export class BackdropCaptureEffect extends Clutter.Effect {
                 this._warned = true;
             }
         }
+        // @ts-expect-error GIR omits GJS's boxed constructor; it only declares ActorNode.new().
         node.add_child(new Clutter.ActorNode(actor, -1));
     }
 

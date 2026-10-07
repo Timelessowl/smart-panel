@@ -3,24 +3,20 @@ import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
-import * as DND from 'resource:///org/gnome/shell/ui/dnd.js';
-import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as DND from '@girs/gnome-shell/ui/dnd';
+import * as Main from '@girs/gnome-shell/ui/main';
 
-import {
-    DASH_BORDER_WIDTH, DASH_ICON_SIZE, DASH_ITEM_INSET, DASH_ITEM_SPACING,
-    DASH_PADDING, SECTION_BORDER_WIDTH, SECTION_FRAME_WIDTH, SECTION_HEIGHT,
-    DASH_DROP_PREVIEW_SIZE, DASH_DROP_PREVIEW_OPACITY,
-} from '../constant.js';
-import {BaseSection} from './baseSection.js';
-import {DashIcon} from './dash/dashIcon.js';
-import {expandedRows, layoutDash, tokensWidth} from './dash/dashLayout.js';
-import {nextAppAction} from './dash/appActivation.js';
+import * as Constants from '@/constant.js';
+import {BaseSection} from '@/components/baseSection.js';
+import {DashIcon} from '@/components/dash/dashIcon.js';
+import * as DashLayout from '@/components/dash/dashLayout.js';
+import * as AppActivation from '@/components/dash/appActivation.js';
 
 // The native frame already provides the outer inset. Only add any
 // requested dash padding that extends beyond it, rather than counting it twice.
-const CONTENT_PADDING = Math.max(0, DASH_PADDING - SECTION_FRAME_WIDTH);
-const CONTENT_INSET = SECTION_BORDER_WIDTH + SECTION_FRAME_WIDTH +
-    CONTENT_PADDING + DASH_BORDER_WIDTH;
+const CONTENT_PADDING = Math.max(0, Constants.DASH_PADDING - Constants.SECTION_FRAME_WIDTH);
+const CONTENT_INSET = Constants.SECTION_BORDER_WIDTH + Constants.SECTION_FRAME_WIDTH +
+    CONTENT_PADDING + Constants.DASH_BORDER_WIDTH;
 
 export class DashSection extends BaseSection {
     static {
@@ -38,7 +34,7 @@ export class DashSection extends BaseSection {
         this._transientInputManager = transientInputManager;
         this._scaleFactor = scaleFactor;
         this._availableWidth = 0;
-        this._maxExpansionHeight = this._scale(SECTION_HEIGHT);
+        this._maxExpansionHeight = this._scale(Constants.SECTION_HEIGHT);
         this._expandedSurface = null;
         this._dismissRegistration = null;
         this._views = new Set();
@@ -63,7 +59,7 @@ export class DashSection extends BaseSection {
             },
         };
         this._dash = new St.BoxLayout({style_class: 'dash-section',
-            style: `padding: 0 ${CONTENT_PADDING}px; spacing: ${DASH_ITEM_SPACING}px;`});
+            style: `padding: 0 ${CONTENT_PADDING}px; spacing: ${Constants.DASH_ITEM_SPACING}px;`});
         this.setSectionContent(this._dash);
         this.refresh();
         DND.addDragMonitor(this._dropMonitor);
@@ -81,16 +77,16 @@ export class DashSection extends BaseSection {
             return;
         this.closeExpanded();
         this._availableWidth = width;
-        this._maxExpansionHeight = Math.max(this._scale(SECTION_HEIGHT), maxExpansionHeight);
+        this._maxExpansionHeight = Math.max(this._scale(Constants.SECTION_HEIGHT), maxExpansionHeight);
         this._rebuildCollapsed();
     }
 
     _rebuildCollapsed() {
         this._dash.destroy_all_children();
         const inset = this._scale(CONTENT_INSET);
-        this._layout = layoutDash(this._entries, this._availableWidth, inset, this._scaleFactor);
+        this._layout = DashLayout.layoutDash(this._entries, this._availableWidth, inset, this._scaleFactor);
         this.preferredWidth = this._layout.width;
-        const height = this._scale(SECTION_HEIGHT - DASH_BORDER_WIDTH * 2);
+        const height = this._scale(Constants.SECTION_HEIGHT - Constants.DASH_BORDER_WIDTH * 2);
         for (const token of this._layout.tokens)
             this._dash.add_child(this._createToken(token, height));
         this._makeDropZone(this._dash);
@@ -102,7 +98,7 @@ export class DashSection extends BaseSection {
         if (token.type === 'launchpad') {
             const button = new St.Button({style_class: 'dash-app-button dash-launchpad',
                 accessible_name: 'Toggle overview', can_focus: true, width, height,
-                child: new St.Icon({icon_name: 'view-app-grid-symbolic', icon_size: DASH_ICON_SIZE})});
+                child: new St.Icon({icon_name: 'view-app-grid-symbolic', icon_size: Constants.DASH_ICON_SIZE})});
             button.connect('clicked', () => {
                 this._activationCycle = null;
                 this.closeExpanded();
@@ -138,11 +134,11 @@ export class DashSection extends BaseSection {
         if (this._expandedSurface || !this._layout.hiddenCount)
             return;
         const inset = this._scale(CONTENT_INSET);
-        const rows = expandedRows(this._entries, this._layout.iconSize,
+        const rows = DashLayout.expandedRows(this._entries, this._layout.iconSize,
             this._availableWidth - inset * 2, this._scaleFactor);
-        const rowHeight = this._scale(DASH_ICON_SIZE + DASH_ITEM_INSET);
-        const spacing = this._scale(DASH_ITEM_SPACING);
-        const gridWidth = Math.max(...rows.map(row => tokensWidth(row, this._scaleFactor)));
+        const rowHeight = this._scale(Constants.DASH_ICON_SIZE + Constants.DASH_ITEM_INSET);
+        const spacing = this._scale(Constants.DASH_ITEM_SPACING);
+        const gridWidth = Math.max(...rows.map(row => DashLayout.tokensWidth(row, this._scaleFactor)));
         const gridHeight = rows.length * rowHeight + (rows.length - 1) * spacing;
         const grid = new St.Widget({layout_manager: new Clutter.FixedLayout(),
             width: gridWidth, height: gridHeight});
@@ -203,7 +199,7 @@ export class DashSection extends BaseSection {
             else
                 entry.item.app.open_new_window(-1);
         } else {
-            const {action, cycle} = nextAppAction(this._activationCycle, entry);
+            const {action, cycle} = AppActivation.nextAppAction(this._activationCycle, entry);
             this._activationCycle = cycle;
             if (action.type === 'focus')
                 Main.activateWindow(action.window.window);
@@ -243,6 +239,11 @@ export class DashSection extends BaseSection {
             this._dismissRegistration.paused = false;
     }
 
+    /**
+     * Shell DND attaches delegates to the participating actors.
+     * @param {St.Widget & {_delegate?: object}} actor
+     * @param {BaseSection & {_delegate?: object}} [surface]
+     */
     _makeDropZone(actor, surface = this) {
         const targetAt = (x, y) => {
             const icons = actor.get_children().filter(child => child instanceof DashIcon);
@@ -311,12 +312,12 @@ export class DashSection extends BaseSection {
     _showDropPreview(source, targetView, after) {
         if (this._previewDraggable !== source._draggable)
             this._clearDropPreview();
-        const size = this._scale(DASH_DROP_PREVIEW_SIZE);
+        const size = this._scale(Constants.DASH_DROP_PREVIEW_SIZE);
         if (!this._dropPreview) {
             this._dropPreview = new St.Bin({
                 style_class: 'dash-drop-preview', width: size, height: size,
-                opacity: DASH_DROP_PREVIEW_OPACITY, reactive: false,
-                child: source.item.createIcon(DASH_DROP_PREVIEW_SIZE),
+                opacity: Constants.DASH_DROP_PREVIEW_OPACITY, reactive: false,
+                child: source.item.createIcon(Constants.DASH_DROP_PREVIEW_SIZE),
             });
             Shell.util_set_hidden_from_pick(this._dropPreview, true);
             this._themeManager.addActor(this._dropPreview);
@@ -333,7 +334,7 @@ export class DashSection extends BaseSection {
         const [surfaceWidth, surfaceHeight] = surface.get_transformed_size();
         const [x, y] = targetView.get_transformed_position();
         const [width, height] = targetView.get_transformed_size();
-        const spacing = this._scale(DASH_ITEM_SPACING);
+        const spacing = this._scale(Constants.DASH_ITEM_SPACING);
         const insertionX = after ? x + width + spacing / 2 : x - spacing / 2;
         this._dropPreview.set_position(
             Math.round(Math.max(surfaceX, Math.min(insertionX - size / 2,

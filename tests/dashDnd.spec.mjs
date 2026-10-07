@@ -1,9 +1,7 @@
-import {loadGjsModule, SignalObject} from './gjsHarness.mjs';
-import {projectDash} from '../components/dash/dashProjection.js';
-import {
-    DASH_BORDER_WIDTH, DASH_ITEM_SPACING, DASH_PADDING, SECTION_BORDER_WIDTH, SECTION_FRAME_WIDTH,
-    SECTION_HEIGHT, DASH_DROP_PREVIEW_SIZE, DASH_DROP_PREVIEW_OPACITY,
-} from '../constant.js';
+import * as GjsHarness from '#tests/gjsHarness.mjs';
+import {SignalObject} from '#tests/gjsHarness.mjs';
+import * as DashProjection from '@/components/dash/dashProjection.js';
+import * as Constants from '@/constant.js';
 
 async function fixture(scale = 1) {
     class Actor extends SignalObject {
@@ -85,12 +83,12 @@ async function fixture(scale = 1) {
             removeChrome: actor => chrome.delete(actor),
         }},
         'resource:///org/gnome/shell/ui/popupMenu.js': {},
-        [new URL('../externals/roundedBackgroundBlur.js', import.meta.url).href]: {
+        [new URL('../src/externals/roundedBackgroundBlur.js', import.meta.url).href]: {
             RoundedBackgroundBlur: class extends Actor {},
         },
     };
-    const {DashSection} = await loadGjsModule(
-        new URL('../components/dashSection.js', import.meta.url), imports,
+    const {DashSection} = await GjsHarness.loadGjsModule(
+        new URL('../src/components/dashSection.js', import.meta.url), imports,
         {global: {settings: {is_writable: () => true}}});
     const theme = {addActor: actor => themeActors.add(actor),
         removeActor: actor => themeActors.delete(actor)};
@@ -105,7 +103,7 @@ async function fixture(scale = 1) {
             hardcodedIds: new Set(['firefox', 'files'])},
         panels: [], changes: [], pauseCount: 0,
         project(monitorIndex, orders) {
-            return projectDash({...this.snapshot, monitorIndex, ...orders});
+            return DashProjection.projectDash({...this.snapshot, monitorIndex, ...orders});
         },
         pause() { this.pauseCount++; }, resume() { this.pauseCount--; },
         setFavorite(app, favorite) {
@@ -116,16 +114,16 @@ async function fixture(scale = 1) {
     };
     function allocate(panel) {
         panel.set_size(panel.preferredWidth,
-            (SECTION_HEIGHT + (SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH) * 2) * scale);
+            (Constants.SECTION_HEIGHT + (Constants.SECTION_FRAME_WIDTH + Constants.SECTION_BORDER_WIDTH) * 2) * scale);
         panel._frame.set_size(panel.width, panel.height);
         panel._surface.set_size(panel.width, panel.height);
-        const frame = (SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH) * scale;
+        const frame = (Constants.SECTION_FRAME_WIDTH + Constants.SECTION_BORDER_WIDTH) * scale;
         panel._dash.set_position(frame, frame);
         panel._dash.set_size(panel.width - frame * 2, panel.height - frame * 2);
-        let x = (Math.max(0, DASH_PADDING - SECTION_FRAME_WIDTH) + DASH_BORDER_WIDTH) * scale;
+        let x = (Math.max(0, Constants.DASH_PADDING - Constants.SECTION_FRAME_WIDTH) + Constants.DASH_BORDER_WIDTH) * scale;
         for (const actor of panel._dash.get_children()) {
             actor.set_position(x, (panel._dash.height - actor.height) / 2);
-            x += actor.width + DASH_ITEM_SPACING * scale;
+            x += actor.width + Constants.DASH_ITEM_SPACING * scale;
         }
     }
     function panel(index = 0, width = 1000 * scale) {
@@ -238,10 +236,10 @@ describe('Dash drag and drop', () => {
             f.dispatch('hover', dragged, p, f.at(target));
             const preview = p._dropPreview;
             const beforeX = preview.x;
-            expect(preview.width).toBe(DASH_DROP_PREVIEW_SIZE * scale);
-            expect(preview.height).toBe(DASH_DROP_PREVIEW_SIZE * scale);
+            expect(preview.width).toBe(Constants.DASH_DROP_PREVIEW_SIZE * scale);
+            expect(preview.height).toBe(Constants.DASH_DROP_PREVIEW_SIZE * scale);
             expect(preview.child.iconSize).toBe(16);
-            expect(preview.opacity).toBe(DASH_DROP_PREVIEW_OPACITY);
+            expect(preview.opacity).toBe(Constants.DASH_DROP_PREVIEW_OPACITY);
             expect(preview.reactive).toBe(false);
             expect(preview.hiddenFromPick).toBe(true);
             expect(preview.chromeOptions.affectsInputRegion).toBe(false);
@@ -249,7 +247,7 @@ describe('Dash drag and drop', () => {
             expect(f.chrome.has(preview)).toBeTruthy();
             f.dispatch('hover', dragged, p, f.at(target, true));
             expect(p._dropPreview).toBe(preview);
-            expect(preview.x - beforeX).toBe(target.width + DASH_ITEM_SPACING * scale);
+            expect(preview.x - beforeX).toBe(target.width + Constants.DASH_ITEM_SPACING * scale);
             expect(p.width).toBe(originalWidth);
             f.finish(dragged);
             expect(p._dropPreview).toBe(null);
@@ -304,11 +302,11 @@ describe('Dash drag and drop', () => {
         // Model native St allocation inside the frame's outline/padding and scroll border.
         surface._frame.set_size(surface.width, surface.height);
         surface._surface.set_size(surface.width, surface.height);
-        const frame = SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH;
+        const frame = Constants.SECTION_FRAME_WIDTH + Constants.SECTION_BORDER_WIDTH;
         surface._content.set_position(frame, frame);
         surface._content.set_size(surface.width - frame * 2, surface.height - frame * 2);
         surface._content.child.set_size(surface._content.width, surface._content.height);
-        grid.set_position(DASH_BORDER_WIDTH, DASH_BORDER_WIDTH);
+        grid.set_position(Constants.DASH_BORDER_WIDTH, Constants.DASH_BORDER_WIDTH);
         const views = grid.children.filter(actor => actor.entry);
         const dragged = views.find(icon => icon.item.appId === 'calendar');
         const target = views.find(icon => icon.item.appId === 'terminal');

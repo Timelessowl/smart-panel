@@ -1,9 +1,10 @@
-import {stylesheet as css} from './stylesheet.mjs';
-import {loadGjsModule, SignalObject} from './gjsHarness.mjs';
-import {DASH_BORDER_WIDTH, SECTION_HEIGHT} from '../constant.js';
+import * as Stylesheet from '#tests/stylesheet.mjs';
+import * as GjsHarness from '#tests/gjsHarness.mjs';
+import {SignalObject} from '#tests/gjsHarness.mjs';
+import * as Constants from '@/constant.js';
 
 async function fixture(scale) {
-    const dotStyle = css.match(/\.dash-window-dot\s*\{([^}]+)\}/)[1];
+    const dotStyle = Stylesheet.stylesheet.match(/\.dash-window-dot\s*\{([^}]+)\}/)[1];
     const dotSize = Number(dotStyle.match(/height:\s*(\d+)px/)[1]) * scale;
     class ActorBox {
         constructor(x1 = 0, y1 = 0, x2 = 0, y2 = 0) {
@@ -51,7 +52,7 @@ async function fixture(scale) {
         'resource:///org/gnome/shell/ui/main.js': {},
         'resource:///org/gnome/shell/ui/popupMenu.js': {},
     };
-    const {DashIcon} = await loadGjsModule(new URL('../components/dash/dashIcon.js', import.meta.url), imports);
+    const {DashIcon} = await GjsHarness.loadGjsModule(new URL('../src/components/dash/dashIcon.js', import.meta.url), imports);
     return {create(iconSize, indicatorCount, rowHeight) {
         const item = {name: 'App', createIcon: () => new Actor({
             naturalWidth: iconSize * scale, naturalHeight: iconSize * scale,
@@ -69,7 +70,7 @@ describe('Dash icon allocation', () => {
         for (const scale of [1, 1.5, 2]) {
             const f = await fixture(scale);
             for (const iconSize of [32, 40]) {
-                for (const rowHeight of [SECTION_HEIGHT - DASH_BORDER_WIDTH * 2, 48]) {
+                for (const rowHeight of [Constants.SECTION_HEIGHT - Constants.DASH_BORDER_WIDTH * 2, 48]) {
                     const plain = f.create(iconSize, 0, rowHeight);
                     for (const count of [1, 2, 3, 4]) {
                         const {content, icon, dots} = f.create(iconSize, count, rowHeight);

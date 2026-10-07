@@ -1,6 +1,7 @@
-import {stylesheet as css} from './stylesheet.mjs';
-import {loadGjsModule, SignalObject} from './gjsHarness.mjs';
-import {SECTION_BORDER_WIDTH, SECTION_FRAME_WIDTH, SECTION_HEIGHT} from '../constant.js';
+import * as Stylesheet from '#tests/stylesheet.mjs';
+import * as GjsHarness from '#tests/gjsHarness.mjs';
+import {SignalObject} from '#tests/gjsHarness.mjs';
+import * as Constants from '@/constant.js';
 
 async function fixture() {
     class BinLayout {}
@@ -19,12 +20,12 @@ async function fixture() {
         }
         destroy() { this.children.forEach(child => child.destroy()); this.destroyed = true; }
     }
-    const {BaseSection} = await loadGjsModule(new URL('../components/baseSection.js', import.meta.url), {
+    const {BaseSection} = await GjsHarness.loadGjsModule(new URL('../src/components/baseSection.js', import.meta.url), {
         'gi://Clutter': {default: {BinLayout, ActorAlign: {FILL: 0}}},
         'gi://GObject': {default: {registerClass: cls => cls}},
         'gi://St': {default: {Widget: Actor, Bin: Actor}},
         'gi://Shell': {default: {}},
-        [new URL('../externals/roundedBackgroundBlur.js', import.meta.url).href]: {
+        [new URL('../src/externals/roundedBackgroundBlur.js', import.meta.url).href]: {
             RoundedBackgroundBlur: class extends Actor {
                 constructor(props) { super(); this.blur = props; }
             },
@@ -39,8 +40,8 @@ async function fixture() {
 describe('Native base section frame', () => {
     it('lets St nest content inside 8px frame padding and a solid 1px outline, without custom allocation', async () => {
         const {BaseSection, section, content, BinLayout} = await fixture();
-        expect(SECTION_FRAME_WIDTH).toBe(8);
-        expect(SECTION_BORDER_WIDTH).toBe(1);
+        expect(Constants.SECTION_FRAME_WIDTH).toBe(8);
+        expect(Constants.SECTION_BORDER_WIDTH).toBe(1);
         expect(section.style).toBeUndefined();
         expect(section._frame.style).toBe('padding: 8px; border-width: 1px;');
         expect(section.layout_manager instanceof BinLayout).toBeTrue();
@@ -69,7 +70,7 @@ describe('Native base section frame', () => {
     it('hides content and border together during expansion without changing the section bounds', async () => {
         const {section, content} = await fixture();
         section.width = 360;
-        section.height = SECTION_HEIGHT + (SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH) * 2;
+        section.height = Constants.SECTION_HEIGHT + (Constants.SECTION_FRAME_WIDTH + Constants.SECTION_BORDER_WIDTH) * 2;
         const frame = section._frame;
         const surface = section._surface;
         section._setContentVisible(false);
@@ -82,7 +83,7 @@ describe('Native base section frame', () => {
         expect(frame.visible).toBeTrue();
         expect(surface.visible).toBeTrue();
         expect([section.width, section.height]).toEqual([360,
-            SECTION_HEIGHT + (SECTION_FRAME_WIDTH + SECTION_BORDER_WIDTH) * 2]);
+            Constants.SECTION_HEIGHT + (Constants.SECTION_FRAME_WIDTH + Constants.SECTION_BORDER_WIDTH) * 2]);
         section.destroy();
         expect(content.destroyed).toBeTrue();
         expect(frame.destroyed).toBeTrue();
@@ -90,17 +91,17 @@ describe('Native base section frame', () => {
     });
 
     it('uses 40% band alpha, an opaque white/black outline and an opaque content child', async () => {
-        expect(css.match(/\.panel-section\s*\{([^}]+)\}/)[1])
+        expect(Stylesheet.stylesheet.match(/\.panel-section\s*\{([^}]+)\}/)[1])
             .toMatch(/background-color:\s*transparent/);
         for (const palette of ['dark', 'light']) {
-            const frame = css.match(new RegExp(`\\.dash-expanded\\.${palette} \\.panel-section-frame\\s*\\{([^}]+)\\}`))[1];
+            const frame = Stylesheet.stylesheet.match(new RegExp(`\\.dash-expanded\\.${palette} \\.panel-section-frame\\s*\\{([^}]+)\\}`))[1];
             expect(frame).toMatch(/background-color:\s*rgba\([^;]+,\s*0\.4\)/);
             expect(frame).toMatch(new RegExp(`border-color:\\s*${palette === 'dark' ? 'white' : 'black'};`));
-            const content = css.match(new RegExp(`\\.dash-expanded\\.${palette} \\.panel-piece\\s*\\{([^}]+)\\}`))[1];
+            const content = Stylesheet.stylesheet.match(new RegExp(`\\.dash-expanded\\.${palette} \\.panel-piece\\s*\\{([^}]+)\\}`))[1];
             expect(content).toMatch(/background-color:\s*rgb\(/);
         }
-        expect(css.match(/\.panel-section-frame\s*\{([^}]+)\}/)[1])
+        expect(Stylesheet.stylesheet.match(/\.panel-section-frame\s*\{([^}]+)\}/)[1])
             .toMatch(/border-style:\s*solid/);
-        expect(css).not.toContain('.panel-section-surface');
+        expect(Stylesheet.stylesheet).not.toContain('.panel-section-surface');
     });
 });

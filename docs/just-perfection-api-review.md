@@ -93,5 +93,5 @@ monitor changes, and restoration on disable. Keep native system controls availab
 through the future replacement integrations. The API alone does not solve that
 functional gap.
 
-The present change renames the blur modules to `externals/`; it does not yet
+The present change renames the blur modules to `src/externals/`; it does not yet
 implement stock-panel hiding or add Just Perfection code to the runtime.

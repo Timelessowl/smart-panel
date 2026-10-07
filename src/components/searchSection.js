@@ -2,9 +2,9 @@ import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
 
-import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as Main from '@girs/gnome-shell/ui/main';
 
-import {BaseSection} from './baseSection.js';
+import {BaseSection} from '@/components/baseSection.js';
 
 export class SearchSection extends BaseSection {
     static {

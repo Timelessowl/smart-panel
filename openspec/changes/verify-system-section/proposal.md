@@ -24,7 +24,7 @@ requirements. `.openspec.yaml` sets `skip_specs: true`; no delta spec is needed.
 
 ## Impact
 
-components/systemSection.js, its stylesheet selectors, and system-section tests. No native calendar, quick-settings, or network-status integration.
+src/components/systemSection.js, its stylesheet selectors, and system-section tests. No native calendar, quick-settings, or network-status integration.
 
 This is a planning artifact only. Creating this change does not implement its
 unchecked tasks or establish native Shell acceptance.

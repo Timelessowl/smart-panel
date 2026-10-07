@@ -3,8 +3,9 @@ import Cogl from 'gi://Cogl';
 import GObject from 'gi://GObject';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
-import {BackdropCaptureEffect} from './backdropCapture.js';
+import {BackdropCaptureEffect} from '@/externals/backdropCapture.js';
 
+/** @type {[string, St.Corner][]} */
 const CORNERS = [
     ['radius_tl', St.Corner.TOPLEFT], ['radius_tr', St.Corner.TOPRIGHT],
     ['radius_br', St.Corner.BOTTOMRIGHT], ['radius_bl', St.Corner.BOTTOMLEFT],

@@ -118,7 +118,7 @@ The insertion helper is a scaled 16-pixel icon with opacity 96/255 by default,
 registered as top chrome without input-region or strut contribution. It is
 positioned at the target's before/after boundary and clamped to the visible
 section bounds. It does not relayout neighbors, so hover coordinates stay stable.
-Size and opacity are in constant.js. Per-section DND monitors and a source
+Size and opacity are in src/constant.js. Per-section DND monitors and a source
 drag-end subscription remove it on leave, invalid hover, drop, cancellation,
 close/refresh, or destruction.
 

@@ -1,5 +1,6 @@
-import {readFile} from 'node:fs/promises';
-import {loadGjsModule, SignalObject} from './gjsHarness.mjs';
+import * as Files from 'node:fs/promises';
+import * as GjsHarness from '#tests/gjsHarness.mjs';
+import {SignalObject} from '#tests/gjsHarness.mjs';
 
 async function fixture(options = {}) {
     class Node {
@@ -104,7 +105,7 @@ async function fixture(options = {}) {
             util_set_hidden_from_pick(actor, hidden) { actor.hiddenFromPick = hidden; }}},
         'gi://St': {default: {Widget: Actor, Corner: {TOPLEFT: 0, TOPRIGHT: 1, BOTTOMRIGHT: 2, BOTTOMLEFT: 3}}},
     };
-    const {RoundedBackgroundBlur} = await loadGjsModule(new URL('../externals/roundedBackgroundBlur.js', import.meta.url), imports);
+    const {RoundedBackgroundBlur} = await GjsHarness.loadGjsModule(new URL('../src/externals/roundedBackgroundBlur.js', import.meta.url), imports);
     const surface = new RoundedBackgroundBlur(options);
     const foreground = new Actor({radii: [16, 18, 20, 22]});
     surface.set_child(foreground);
@@ -316,7 +317,7 @@ describe('Captured-child rounded background blur', () => {
         expect(f.surface.blur.radius).toBe(0);
         expect(Object.hasOwn(Object.getPrototypeOf(f.surface), 'vfunc_allocate')).toBeFalse();
         expect(() => f.surface.set_child(new f.Actor())).toThrowError(/only have one/);
-        const base = await readFile(new URL('../components/baseSection.js', import.meta.url), 'utf8');
+        const base = await Files.readFile(new URL('../src/components/baseSection.js', import.meta.url), 'utf8');
         expect(base).toContain('//   new Shell.BlurEffect({ mode: Shell.BlurMode.BACKGROUND, radius: 99 }),');
         f.surface.destroy();
     });

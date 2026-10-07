@@ -3,7 +3,7 @@
 ## Context
 
 The master contract is [panel-shell](../../specs/panel-shell/spec.md).
-`extension.js` creates a shared `DashSource` and a `MonitorManager`.
+`src/extension.js` creates a shared `DashSource` and a `MonitorManager`.
 The manager owns one `BottomPanel` per discovered monitor, plus a shared
 `ThemeManager` and `TransientInputManager`. Monitor changes currently destroy
 and recreate panels. Shared observer state is separate from per-panel views.
@@ -36,7 +36,7 @@ is the opaque section content. The frame's native 8px padding exposes its
 and black in light theme. Native St allocation, St.Bin and Clutter.BinLayout handle
 border and padding without custom allocation or manual paint clipping. The frame
 is a parent container, not an overlay. Band and outline thickness come from
-`SECTION_FRAME_WIDTH` and `SECTION_BORDER_WIDTH`; palette colors live in `style/_themes.scss`.
+`SECTION_FRAME_WIDTH` and `SECTION_BORDER_WIDTH`; palette colors live in `src/style/_themes.scss`.
 BottomPanel still owns outer section geometry. Control padding
 and dash row height fit inside the native border without resizing icons or
 counting the inset twice. During expansion the collapsed frame and content are
@@ -47,7 +47,7 @@ Per-section duplicated borders and an external wrapping manager are rejected.
 
 ### Reusable rounded background blur
 
-`externals/roundedBackgroundBlur.js` is a section-independent St.Widget using
+`src/externals/roundedBackgroundBlur.js` is a section-independent St.Widget using
 native BinLayout. It stacks a backdrop content actor below the unchanged frame.
 The architecture follows Blur My Shell PR #976: capture the live background into
 a texture, expose it as Clutter.Content, blur the child, then mask the result.
@@ -56,7 +56,7 @@ pipeline. A Shell.GLSLEffect mask reads foreground CSS corners and uses
 premultiplied-alpha blending. Both effect caches are refreshed at paint time
 because captured content changes externally, without a continuous redraw loop.
 
-`externals/backdropCapture.js` captures before any child offscreen effects run.
+`src/externals/backdropCapture.js` captures before any child offscreen effects run.
 Framebuffer modelview/projection/viewport determine pixel coordinates, avoiding
 double scaling. Public actor.peek_stage_views() identifies each framebuffer's
 view; its layout/scale convert damage regions. Only damaged rectangles are copied
@@ -107,8 +107,13 @@ feature that created it.
 
 ### Installation stays file-based
 
+Runtime JavaScript and Sass live in `src/`. Source imports use the `@/` alias,
+and Shell resource modules are imported through `@girs/gnome-shell` re-exports.
+Only classes use named imports; constants and helper functions use namespaces.
+TypeScript checks the existing JavaScript using GNOME 48 GIR definitions.
+
 Rollup builds independent Shell and preferences entry points, preserving native
-`gi://` and `resource://` imports. Its Sass plugin compiles `style/stylesheet.scss`
+`gi://` and `resource://` imports. Its Sass plugin compiles `src/style/stylesheet.scss`
 into `dist/stylesheet.css`; metadata and schema XML are emitted as build assets,
 and `glib-compile-schemas` compiles the schema. Independent Node scripts package
 the existing dist as a ZIP or install it into the user's extension directory.

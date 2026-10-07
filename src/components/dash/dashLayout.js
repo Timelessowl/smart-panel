@@ -1,38 +1,32 @@
-import {
-    DASH_ICON_SIZE,
-    DASH_SMALL_ICON_SIZE,
-    DASH_ITEM_INSET,
-    DASH_ITEM_SPACING,
-    DASH_SEPARATOR_WIDTH,
-} from '../../constant.js';
+import * as Constants from '@/constant.js';
 
 function tokensFor(entries, count, iconSize, hiddenCount = 0) {
-    const tokens = [{type: 'launchpad', width: DASH_ICON_SIZE + DASH_ITEM_INSET}];
+    const tokens = [{type: 'launchpad', width: Constants.DASH_ICON_SIZE + Constants.DASH_ITEM_INSET}];
     let hasSeparator = false;
     for (const entry of entries.slice(0, count)) {
         if (entry.group === 'running' && !hasSeparator) {
-            tokens.push({type: 'separator', width: DASH_SEPARATOR_WIDTH});
+            tokens.push({type: 'separator', width: Constants.DASH_SEPARATOR_WIDTH});
             hasSeparator = true;
         }
-        tokens.push({type: 'icon', entry, width: iconSize + DASH_ITEM_INSET});
+        tokens.push({type: 'icon', entry, width: iconSize + Constants.DASH_ITEM_INSET});
     }
     if (hiddenCount) {
         if (entries[count]?.group === 'running' && !hasSeparator)
-            tokens.push({type: 'separator', width: DASH_SEPARATOR_WIDTH});
-        tokens.push({type: 'overflow', hiddenCount, width: iconSize + DASH_ITEM_INSET});
+            tokens.push({type: 'separator', width: Constants.DASH_SEPARATOR_WIDTH});
+        tokens.push({type: 'overflow', hiddenCount, width: iconSize + Constants.DASH_ITEM_INSET});
     }
     return tokens;
 }
 
 export function tokensWidth(tokens, scale = 1) {
     return tokens.reduce((sum, token) => sum + Math.round(token.width * scale), 0) +
-        Math.max(0, tokens.length - 1) * Math.round(DASH_ITEM_SPACING * scale);
+        Math.max(0, tokens.length - 1) * Math.round(Constants.DASH_ITEM_SPACING * scale);
 }
 
 // All dimensions are in stage coordinates. Icons use logical pixel sizes.
 export function layoutDash(entries, availableWidth, inset, scale = 1) {
     const usableWidth = Math.max(0, availableWidth - inset * 2);
-    for (const iconSize of [DASH_ICON_SIZE, DASH_SMALL_ICON_SIZE]) {
+    for (const iconSize of [Constants.DASH_ICON_SIZE, Constants.DASH_SMALL_ICON_SIZE]) {
         const tokens = tokensFor(entries, entries.length, iconSize);
         if (tokensWidth(tokens, scale) <= usableWidth)
             return {iconSize, tokens, hiddenCount: 0,
@@ -41,22 +35,22 @@ export function layoutDash(entries, availableWidth, inset, scale = 1) {
 
     for (let count = entries.length - 1; count >= 0; count--) {
         const hiddenCount = entries.length - count;
-        const tokens = tokensFor(entries, count, DASH_SMALL_ICON_SIZE, hiddenCount);
+        const tokens = tokensFor(entries, count, Constants.DASH_SMALL_ICON_SIZE, hiddenCount);
         if (tokensWidth(tokens, scale) <= usableWidth)
-            return {iconSize: DASH_SMALL_ICON_SIZE, tokens, hiddenCount,
+            return {iconSize: Constants.DASH_SMALL_ICON_SIZE, tokens, hiddenCount,
                 width: tokensWidth(tokens, scale) + inset * 2};
     }
 
     // On exceptionally narrow monitors, clip rather than crossing into search.
-    const tokens = tokensFor(entries, 0, DASH_SMALL_ICON_SIZE, entries.length);
-    return {iconSize: DASH_SMALL_ICON_SIZE, tokens, hiddenCount: entries.length,
+    const tokens = tokensFor(entries, 0, Constants.DASH_SMALL_ICON_SIZE, entries.length);
+    return {iconSize: Constants.DASH_SMALL_ICON_SIZE, tokens, hiddenCount: entries.length,
         width: Math.min(availableWidth, tokensWidth(tokens, scale) + inset * 2)};
 }
 
 export function expandedRows(entries, iconSize, usableWidth, scale = 1) {
     const tokens = tokensFor(entries, entries.length, iconSize);
     const rows = [[]];
-    const spacing = Math.round(DASH_ITEM_SPACING * scale);
+    const spacing = Math.round(Constants.DASH_ITEM_SPACING * scale);
     let width = 0;
     for (let index = 0; index < tokens.length; index++) {
         const token = tokens[index];

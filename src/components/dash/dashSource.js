@@ -1,10 +1,10 @@
 import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
-import * as AppFavorites from 'resource:///org/gnome/shell/ui/appFavorites.js';
+import * as AppFavorites from '@girs/gnome-shell/ui/appFavorites';
 
-import {AppItem} from './appItem.js';
-import {WindowItem} from './windowItem.js';
-import {projectDash} from './dashProjection.js';
+import {AppItem} from '@/components/dash/appItem.js';
+import {WindowItem} from '@/components/dash/windowItem.js';
+import * as DashProjection from '@/components/dash/dashProjection.js';
 
 const FIXED_APP_IDS = [
     ['firefox.desktop', 'firefox-esr.desktop', 'org.mozilla.firefox.desktop'],
@@ -149,7 +149,7 @@ export class DashSource {
     }
 
     project(monitorIndex, orders = {}) {
-        return projectDash({...this.snapshot, monitorIndex, ...orders});
+        return DashProjection.projectDash({...this.snapshot, monitorIndex, ...orders});
     }
 
     setFavorite(item, favorite) {

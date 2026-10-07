@@ -1,8 +1,8 @@
-import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as Main from '@girs/gnome-shell/ui/main';
 
-import {BottomPanel} from './components/bottomPanel.js';
-import {ThemeManager} from './themeManager.js';
-import {TransientInputManager} from './transientInputManager.js';
+import {BottomPanel} from '@/components/bottomPanel.js';
+import {ThemeManager} from '@/themeManager.js';
+import {TransientInputManager} from '@/transientInputManager.js';
 
 export class MonitorManager {
     constructor({dashSource, indicators, openPreferences}) {

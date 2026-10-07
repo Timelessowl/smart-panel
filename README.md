@@ -11,7 +11,7 @@ the bottom of every connected monitor:
 
 The transparent space between pieces remains part of the panel's input area.
 Layout values, panel padding, gaps, and widths can all be changed in
-`constant.js`. `SECTION_HEIGHT` is content height only. BottomPanel adds
+`src/constant.js`. `SECTION_HEIGHT` is content height only. BottomPanel adds
 `SECTION_FRAME_WIDTH` and `SECTION_BORDER_WIDTH` on both sides when allocating
 sections. `PANEL_HEIGHT` adds those edges plus top and bottom padding to content
 height. Defaults are 64px content, an 8px translucent band, a 1px solid outline,
@@ -26,11 +26,11 @@ plain `canExpand` property. Expandable sections set that property in their own
 constructors. `BottomPanel._updateGeometry()` is the single
 owner of panel and section placement and sizing. Dash and indicators opt into
 expansion; Debian, search, and system sections do not. `SECTION_FRAME_WIDTH` in
-`constant.js` changes every frame in one place.
+`src/constant.js` changes every frame in one place.
 
-`themeManager.js` follows GNOME 48's system Dark Style preference and applies a
+`src/themeManager.js` follows GNOME 48's system Dark Style preference and applies a
 `.dark` or `.light` class to every monitor panel. The two palettes live in
-`style/_themes.scss`. Section surfaces are opaque; the surrounding frame uses 40%
+`src/style/_themes.scss`. Section surfaces are opaque; the surrounding frame uses 40%
 alpha by default, with an 8px default thickness and a separate 1px opaque outer
 outline (white in dark theme, black in light theme). BaseSection has a transparent
 background and contains an `St.Bin` frame. That frame paints the translucent
@@ -40,15 +40,15 @@ including CSS scaling; BaseSection has no custom allocation or paint clipping.
 Section content heights are 64 logical pixels and icon sizes are unchanged.
 The dash counts the frame padding and outline once in its width budget and fits
 its rows inside them. Existing control padding avoids a second frame inset.
-Frame alpha is configured in the dark/light frame background colors in `style/_themes.scss`;
-band and outline thickness stay in `constant.js`. Transparency shows the scene behind
+Frame alpha is configured in the dark/light frame background colors in `src/style/_themes.scss`;
+band and outline thickness stay in `src/constant.js`. Transparency shows the scene behind
 the panel (wallpaper, or a window if one is physically underneath), not an
 extension-owned copy of the wallpaper.
 
 Rounded background blur is reusable independently of sections:
 
 ```javascript
-import {RoundedBackgroundBlur} from './externals/roundedBackgroundBlur.js';
+import {RoundedBackgroundBlur} from '@/externals/roundedBackgroundBlur.js';
 
 const surface = new RoundedBackgroundBlur({radius: 44, brightness: 1});
 surface.set_child(widget); // A St widget styled with CSS border-radius.
@@ -59,8 +59,8 @@ Each surface uses native `Clutter.BinLayout` to stack a decorative backdrop chil
 below its foreground; no `vfunc_allocate` or per-section geometry code is needed.
 The capture/child/mask architecture follows
 [Blur My Shell PR #976](https://github.com/aunetx/blur-my-shell/pull/976).
-These reusable adaptations live directly in `externals/`; their references and
-local responsibilities are recorded in [externals/README.md](externals/README.md).
+These reusable adaptations live directly in `src/externals/`; their references and
+local responsibilities are recorded in [src/externals/README.md](src/externals/README.md).
 This implementation keeps GNOME's native Gaussian blur in `ACTOR` mode instead
 of importing that project's complete effects pipeline. `Shell.GLSLEffect` masks
 the finished blur, reading all four foreground CSS radii on every paint. The
@@ -85,14 +85,14 @@ ordering, damage, scaling and cleanup; actual GPU output still needs a GNOME
 48.7 visual check after a Shell restart. The commented original BACKGROUND blur
 in BaseSection is retained for comparison.
 
-`monitorManager.js` discovers monitors dynamically and owns one independent
+`src/monitorManager.js` discovers monitors dynamically and owns one independent
 panel instance per monitor. Panels are rebuilt when the monitor layout changes.
 Each panel determines its own scale in its constructor: Wayland uses a factor of
 one, while X11 uses that monitor's `geometry_scale`.
 
 ## Dash
 
-`components/dash/` contains `AppItem` and `WindowItem` models, one Shell-observing
+`src/components/dash/` contains `AppItem` and `WindowItem` models, one Shell-observing
 `DashSource`, the `DashIcon` view, and independently testable projection, layout,
 and activation logic. `DashSection` owns its views and session-only drag order;
 `BottomPanel` remains the authority for its allocated bounds.
@@ -121,7 +121,7 @@ menus offer desktop-file actions and favorite/unfavorite controls. Dragging
 reorders within a subsection on that monitor only; dragging a running item into
 Favorites adds it to GNOME's system favorites. Local ordering is not persisted.
 Valid drop targets show a translucent 16px app-icon preview at the insertion
-point, without resizing the dash. Its size and opacity live in `constant.js`.
+point, without resizing the dash. Its size and opacity live in `src/constant.js`.
 All stub code has been removed. The former stub launcher opens dash preferences.
 
 The extension runtime needs no bundler or package manager. Rollup bundles the GJS
@@ -137,7 +137,7 @@ complete height, including the top and bottom padding.
 
 ## Build, package, and install
 
-Use Node.js 22 or newer and install the development dependencies with `npm ci`.
+Use Node.js 22.15 or newer and install the development dependencies with `npm ci`.
 Building also requires GLib's `glib-compile-schemas` on your PATH (usually provided
 by `libglib2.0-bin` on Debian/Ubuntu or `glib2` on Fedora).
 
@@ -174,7 +174,7 @@ For a disposable installation or a custom extension directory, pass the full tar
 npm run install:local -- --dest /tmp/simple-bottom-panel-test
 ```
 
-Edit Sass in `style/`, using `style/stylesheet.scss` as the entry point. Shared
+Edit Sass in `src/style/`, using `src/style/stylesheet.scss` as the entry point. Shared
 dark/light palette maps live in `_themes.scss`; panel, Debian, dash, search, and
 system/indicator styles have separate partials. Rollup's Sass plugin compiles them
 into the `stylesheet.css` expected by GNOME Shell. `dist/` and `releases/` are
@@ -183,10 +183,29 @@ generated and ignored by Git. Failed or missing builds must be fixed with
 
 ## Tests
 
+Runtime JavaScript lives in `src/`, preserving the component and external-module
+directories. TypeScript checks that JavaScript with `allowJs` and `checkJs`; no
+TypeScript output is installed. Checking is gradual (`strict: false`), and
+`tsconfig.json` also includes future `.ts` files. Two boxed Clutter constructors
+retain targeted `@ts-expect-error` comments because the GIR definitions declare
+only their static constructors.
+The GIR definitions and GNOME Shell module declarations follow Shell 48, with
+pinned GIR versions and dependency overrides to keep namespace types consistent.
+
+Use `@/` for source imports. Rollup, TypeScript, and the Node test loader resolve
+it to `src/`. Import Shell modules through `@girs/gnome-shell`, for example
+`import * as Main from '@girs/gnome-shell/ui/main'`; Rollup follows those packages'
+re-exports to native `resource://` modules. GIR libraries keep their native
+`gi://` default namespace imports. Only classes use named imports; constants and
+helper functions use namespaces such as `Constants.SECTION_HEIGHT` and
+`DashLayout.layoutDash`. Node tooling and tests use package aliases `#scripts/`,
+`#tests/`, and `#rollup` for their own modules.
+
 Install the development dependencies and run the Jasmine suites:
 
 ```sh
 npm ci
+npm run typecheck
 npm test
 npm run test:tooling
 ```
@@ -198,8 +217,8 @@ randomizes spec order and fails specs with no expectations.
 
 `test:tooling` uses Node's test runner to build in a temporary project, inspect the
 ZIP, and install into disposable targets. It checks native import preservation,
-compiled Sass and schemas, obsolete-file cleanup, independent commands, and
-failure handling. It requires `glib-compile-schemas`. Stylesheet assertions in
+compiled Sass and schemas, source import conventions, obsolete-file cleanup,
+independent commands, and failure handling. It requires `glib-compile-schemas`. Stylesheet assertions in
 the Jasmine suites compile the Sass source directly, so `npm test` needs no
 pre-existing `dist/` or GLib compiler.
 

@@ -1,9 +1,9 @@
 import Adw from 'gi://Adw';
 import Gio from 'gi://Gio';
-import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
+import {ExtensionPreferences} from '@girs/gnome-shell/extensions/prefs';
 
 export default class SimpleBottomPanelPreferences extends ExtensionPreferences {
-    fillPreferencesWindow(window) {
+    async fillPreferencesWindow(window) {
         const settings = this.getSettings();
         const page = new Adw.PreferencesPage({title: 'Dash', icon_name: 'view-app-grid-symbolic'});
         const group = new Adw.PreferencesGroup({title: 'Apps and windows'});
