@@ -66,7 +66,7 @@ export class DashButtonContent extends St.Widget {
 
 export class DashIcon extends PanelMenuButton {
     /** @type {ReturnType<typeof import('@girs/gnome-shell/ui/dnd').makeDraggable>} */
-    _draggable;
+    draggable;
     static {
         GObject.registerClass(this);
     }
@@ -86,6 +86,8 @@ export class DashIcon extends PanelMenuButton {
         this.dragDrop = null;
         const menu = new PopupMenu.PopupMenu(this, 0.5, St.Side.BOTTOM);
         this.setMenu(menu);
+        // PopupDummyMenu replaces the source delegate; DND needs the icon itself.
+        this._delegate = this;
         menu.connect('open-state-changed', (_menu, open) =>
             this._owner?.menuChanged(menu.actor, open));
 
@@ -132,6 +134,16 @@ export class DashIcon extends PanelMenuButton {
         return Clutter.EVENT_PROPAGATE;
     }
 
+    get dragging() { return this._dragging; }
+
+    setDragging(dragging) {
+        this._dragging = dragging;
+        if (dragging) {
+            this.menu.close();
+            this._clickAction.release();
+        }
+    }
+
     getDragActor() {
         return this.item.app.create_icon_texture(this.iconSize);
     }
@@ -151,7 +163,7 @@ export class DashIcon extends PanelMenuButton {
     _toggleMenu() {
         this._populateMenu();
         this._clickAction.release();
-        this._draggable?.fakeRelease();
+        this.draggable?.fakeRelease();
         this.menu.toggle();
     }
 
@@ -169,7 +181,7 @@ export class DashIcon extends PanelMenuButton {
             menu.addAction('Close Window', () =>
                 this.entry.representedWindow.delete(global.get_current_time()));
         }
-        if (!this.entry.hardcoded && this._owner.canSetFavorite(app)) {
+        if (this._owner.canSetFavorite(app)) {
             const favorite = this._owner.isFavorite(app.get_id());
             menu.addAction(favorite ? 'Remove from Favorites' : 'Add to Favorites', () =>
                 this._owner.setFavorite(app, !favorite));

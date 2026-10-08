@@ -29,7 +29,7 @@ async function fixture({desktopActions = [], canOpen = true, pinnable = true,
         get_app_info: () => ({list_actions: () => desktopActions,
             get_action_name: action => `Desktop ${action}`})};
     const entry = {item: {app, name: 'App'}, hardcoded, representedWindow, indicatorCount: 0};
-    const owner = {menuChanged: (_actor, open) => menuStates.push(open), canSetFavorite: () => pinnable, isFavorite: () => favorite,
+    const owner = {menuChanged: (_actor, open) => menuStates.push(open), canSetFavorite: () => pinnable && !hardcoded, isFavorite: () => favorite,
         openNewWindow: app => calls.push(['window', app]),
         launchAction: (app, action) => calls.push(['action', app, action]),
         setFavorite: (app, favorite) => calls.push(['favorite', app, favorite]),
@@ -82,6 +82,7 @@ describe('Dash native panel menus', () => {
         expect(f.icon instanceof f.native.PanelMenu.Button).toBe(true);
         expect(f.icon.menu instanceof f.native.PopupMenu.PopupMenu).toBe(true);
         expect(f.icon.container.child).toBe(f.icon);
+        expect(f.icon._delegate).toBe(f.icon);
         expect(f.icon.menu.side).toBe(1);
         expect(f.native.uiGroup.has(f.icon.menu.actor)).toBe(true);
         const event = button => ({type: () => f.Clutter.EventType.BUTTON_PRESS, get_button: () => button});
@@ -103,11 +104,11 @@ describe('Dash native panel menus', () => {
             expect(f.icon.menu.isOpen).toBe(false);
         }
         expect(f.calls.length).toBe(2);
-        f.icon._dragging = true;
+        f.icon.setDragging(true);
         f.icon._clickAction.emit('clicked');
         f.icon.vfunc_event(key(f.Clutter.KEY_Return));
         expect(f.calls.length).toBe(2);
-        f.icon._dragging = false;
+        f.icon.setDragging(false);
         f.icon.vfunc_event(key(f.Clutter.KEY_Menu));
         expect(f.icon.menu.isOpen).toBe(true);
     });

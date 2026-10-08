@@ -67,7 +67,7 @@ async function fixture(scale) {
             naturalWidth: iconSize * scale, naturalHeight: iconSize * scale,
         })}};
         const button = new DashIcon({item, indicatorCount, group: 'favorites', hardcoded: true},
-            {}, iconSize, (iconSize + 8) * scale, rowHeight * scale);
+            {canSetFavorite: () => false}, iconSize, (iconSize + 8) * scale, rowHeight * scale);
         const content = button.children[0];
         content.vfunc_allocate(new ActorBox(100, 200, 100 + button.width, 200 + button.height));
         return {content, icon: content._icon, dots: content._dots, highlight: content._highlight};

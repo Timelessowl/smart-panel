@@ -47,6 +47,10 @@ export function createDoubles(Actor) {
             this.container.set_child(this);
             if (!dontCreateMenu)
                 this.setMenu(new PopupMenu(this, alignment, 0));
+            else {
+                this.menu = {destroy() {}};
+                this._delegate = this.menu;
+            }
             this.connect('destroy', () => {
                 this.menu?.destroy();
                 this.container.set_child(null);

@@ -1,8 +1,7 @@
 import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
 import * as AppFavorites from '@girs/gnome-shell/ui/appFavorites';
-
-import {DashLauncher} from '@/components/dash/dashLauncher.js';
+import {DashLaunches} from '@/components/dash/dashUtils.js';
 
 const FIXED_APP_IDS = [
     ['firefox.desktop', 'firefox-esr.desktop', 'org.mozilla.firefox.desktop'],
@@ -16,8 +15,8 @@ export class DashSource {
         this._settings = settings;
         this._appSystem = Shell.AppSystem.get_default();
         this._favorites = AppFavorites.getAppFavorites();
+        this._launches = new DashLaunches();
         this._tracker = Shell.WindowTracker.get_default();
-        this._launcher = new DashLauncher();
         this._apps = new Map();
         this._windows = new Map();
         this._connections = [];
@@ -62,6 +61,55 @@ export class DashSource {
             (monitor === null || window.get_monitor() === monitor));
     }
 
+    // Orders belong to the requesting dash; deriving its entries never changes
+    // shared state. Monitor scope is applied once, before grouping or counting.
+    getEntries({monitor = null, favoriteOrder = [], runningOrder = []} = {}) {
+        const windows = this.monitorOnly ? this.getOpenMonitorWindows(monitor) : this.getOpenedWindows();
+        const windowsByApp = new Map();
+        for (const window of windows) {
+            const app = this.getWindowApp(window);
+            if (!windowsByApp.has(app))
+                windowsByApp.set(app, []);
+            windowsByApp.get(app).push(window);
+        }
+        const positions = new Map(favoriteOrder.map((id, index) => [id, index]));
+        const favorites = this.getFavorites();
+        // Fixed launchers already have source order. Only reorder movable ones.
+        const orderedFavorites = [...favorites.filter(app => this.isFixedFavorite(app.get_id())),
+            ...favorites.filter(app => !this.isFixedFavorite(app.get_id())).sort((a, b) =>
+                (positions.get(a.get_id()) ?? favoriteOrder.length) -
+                (positions.get(b.get_id()) ?? favoriteOrder.length))];
+        const represented = new Set();
+        const favoriteEntries = orderedFavorites.map(app => {
+            const appWindows = windowsByApp.get(app) ?? [];
+            const window = this.perWindow ? appWindows[0] ?? null : null;
+            if (window)
+                represented.add(window);
+            return this._entry(app, window, 'favorites', appWindows.length);
+        });
+        const favoriteApps = new Set(favorites);
+        const runningEntries = this.perWindow
+            ? windows.filter(window => !represented.has(window)).map(window =>
+                this._entry(this.getWindowApp(window), window, 'running', 0))
+            : this.getRunningApps().filter(app => !favoriteApps.has(app) && windowsByApp.has(app))
+                .map(app => this._entry(app, null, 'running', windowsByApp.get(app).length));
+        const runningPositions = new Map(runningOrder.map((id, index) => [id, index]));
+        runningEntries.sort((a, b) =>
+            (runningPositions.get(a.item.id) ?? runningOrder.length) -
+            (runningPositions.get(b.item.id) ?? runningOrder.length));
+        return {favorites: favoriteEntries, running: runningEntries};
+    }
+
+    _entry(app, window, group, windowCount) {
+        const appId = app.get_id();
+        return {
+            item: {id: window ? `window:${window.get_stable_sequence()}` : `app:${appId}`,
+                appId, app, name: window?.get_title() || app.get_name()},
+            group, hardcoded: this.isFixedFavorite(appId), representedWindow: window,
+            indicatorCount: Math.min(this.perWindow ? 1 : 4, windowCount),
+        };
+    }
+
     isFavorite(appId) {
         return this._state.favorites.some(app => app.get_id() === appId);
     }
@@ -69,8 +117,12 @@ export class DashSource {
     isFixedFavorite(appId) { return this._state.fixedIds.has(appId); }
 
     canSetFavorite(app) {
-        return !this.isFixedFavorite(app.get_id()) && !app.is_window_backed() &&
+        return this.canReorderFavorite(app) &&
             global.settings.is_writable('favorite-apps');
+    }
+
+    canReorderFavorite(app) {
+        return !this.isFixedFavorite(app.get_id()) && !app.is_window_backed();
     }
 
     setFavorite(app, favorite) {
@@ -83,11 +135,11 @@ export class DashSource {
     }
 
     openNewWindow(app, monitor) {
-        this._launcher.openNewWindow(app, this.monitorOnly ? monitor : null);
+        this._launches.openNewWindow(app, this.monitorOnly ? monitor : null);
     }
 
     launchAction(app, action, monitor) {
-        this._launcher.launchAction(app, action, this.monitorOnly ? monitor : null);
+        this._launches.launchAction(app, action, this.monitorOnly ? monitor : null);
     }
 
     _queueRefresh() {
@@ -129,7 +181,7 @@ export class DashSource {
                 }
                 record.app = app;
                 if (!window.skip_taskbar) {
-                    this._launcher.observeWindow(window, app);
+                    this._launches.observeWindow(window, app);
                     windows.push(window);
                 }
             }
@@ -175,7 +227,7 @@ export class DashSource {
             GLib.source_remove(this._refreshId);
         this._refreshId = 0;
         this._listeners.clear();
-        this._launcher.destroy();
+        this._launches.destroy();
         this._disconnect(this._connections);
         for (const connections of this._apps.values())
             this._disconnect(connections);

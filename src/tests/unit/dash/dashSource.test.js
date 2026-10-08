@@ -73,12 +73,18 @@ async function fixture() {
         'gi://GLib': {default: GLib},
         'gi://Shell': {default: {AppSystem: {get_default: () => appSystem},
             WindowTracker: {get_default: () => tracker}}},
+        'resource:///org/gnome/shell/ui/main.js': {activateWindow() {}},
         'resource:///org/gnome/shell/ui/appFavorites.js': {getAppFavorites: () => favorites},
     };
     const shellSettings = {writable: true, is_writable: () => shellSettings.writable};
     const {DashSource} = await GjsHarness.loadGjsModule(new URL('components/dash/dashSource.js', GjsHarness.sourceDirectory),
         imports, {global: {display, settings: shellSettings, get_current_time: () => 123}});
     const source = new DashSource(settings);
+    const {DashActions} = await GjsHarness.loadGjsModule(
+        new URL('components/dash/dashUtils.js', GjsHarness.sourceDirectory), imports,
+        {global: {display, get_current_time: () => 123}});
+    const actions = new DashActions(source, 0);
+    const destroy = () => { actions.destroy(); source.destroy(); };
     const makeWindow = (app, stableId, monitor = 0) => {
         const window = new SignalObject();
         const actor = new SignalObject();
@@ -95,7 +101,7 @@ async function fixture() {
         appSystem.emit('app-state-changed', app);
         return window;
     };
-    return {source, apps, firefox, files, terminal, makeApp, makeWindow, favorites,
+    return {source, actions, destroy, makeActions: monitor => new DashActions(source, monitor), apps, firefox, files, terminal, makeApp, makeWindow, favorites,
         settings, shellSettings, display, tracker, sources, timeouts, flush, expire, appSystem};
 }
 
@@ -107,7 +113,7 @@ describe('Dash source queries and lifecycle', () => {
         f.appSystem.emit('installed-changed'); f.flush();
         expect(f.source.getFavorites()[0]).toBe(f.firefox);
         expect(f.source.getFavorites().length).toBe(3);
-        f.source.destroy();
+        f.destroy();
     });
 
     it('queries eligible native windows by app and monitor across all workspaces', async () => {
@@ -129,7 +135,7 @@ describe('Dash source queries and lifecycle', () => {
         expect(f.source.getAppWindows(f.firefox)).toEqual([second]);
         first.skip_taskbar = false; first.emit('notify::skip-taskbar'); f.flush();
         expect(f.source.getAppWindows(f.firefox)).toEqual([second, first]);
-        f.source.destroy();
+        f.destroy();
     });
 
     it('keeps app order independent of Shell MRU and observes both mode settings', async () => {
@@ -141,7 +147,33 @@ describe('Dash source queries and lifecycle', () => {
         expect(f.source.perWindow).toBe(true);
         expect(f.source.monitorOnly).toBe(true);
         expect(f.source.getFavorites()).toEqual([f.firefox, f.files, f.terminal]);
-        f.source.destroy();
+        f.destroy();
+    });
+
+    it('builds isolated entries from refreshed state without leaking local order between monitors', async () => {
+        const f = await fixture();
+        const editor = f.makeApp('editor.desktop');
+        const remote = f.makeWindow(f.firefox, 10, 1);
+        f.makeWindow(f.terminal, 20, 0);
+        f.makeWindow(editor, 30, 0);
+        f.settings.set_boolean('monitor-only', true); f.flush();
+        const local = f.source.getEntries({monitor: 0});
+        expect(local.favorites[0].indicatorCount).toBe(0);
+        expect(f.source.getEntries({monitor: 1}).favorites[0].indicatorCount).toBe(1);
+        expect(local.running.map(entry => entry.item.app)).toEqual([editor]);
+        remote.monitor = 0;
+        f.display.emit('window-entered-monitor', 0, remote);
+        f.settings.set_boolean('per-window-mode', true); f.flush();
+        expect(f.source.getEntries({monitor: 0}).favorites[0].representedWindow).toBe(remote);
+        expect(f.source.getEntries({monitor: 1}).favorites[0].representedWindow).toBe(null);
+        f.source.setFavorite(editor, true); f.flush();
+        const ordered = f.source.getEntries({monitor: 0,
+            favoriteOrder: [editor.id, f.terminal.id, f.firefox.id]});
+        expect(ordered.favorites.map(entry => entry.item.app)).toEqual([
+            f.firefox, f.files, editor, f.terminal]);
+        expect(f.source.getEntries({monitor: 1}).favorites.map(entry => entry.item.app)).toEqual([
+            f.firefox, f.files, f.terminal, editor]);
+        f.destroy();
     });
 
     it('changes real favorite membership and rejects fixed, window-backed, or locked apps', async () => {
@@ -160,7 +192,7 @@ describe('Dash source queries and lifecycle', () => {
         expect(f.source.isFavorite(editor.id)).toBe(false);
         f.shellSettings.writable = false;
         expect(f.source.canSetFavorite(f.terminal)).toBe(false);
-        f.source.destroy();
+        f.destroy();
     });
 
     it('coalesces updates without a global pause and disconnects pending work on shutdown', async () => {
@@ -176,7 +208,7 @@ describe('Dash source queries and lifecycle', () => {
         unsubscribe();
         f.appSystem.emit('installed-changed');
         expect(f.sources.size).toBe(1);
-        f.source.destroy();
+        f.destroy();
         expect(f.sources.size).toBe(0);
         for (const object of [f.firefox, f.files, f.terminal, f.appSystem, f.favorites,
             f.settings, f.display, f.tracker])
@@ -187,7 +219,7 @@ describe('Dash source queries and lifecycle', () => {
         const f = await fixture();
         const remote = f.makeWindow(f.firefox, 1, 1); f.flush();
         f.settings.set_boolean('monitor-only', true); f.flush();
-        f.source.openNewWindow(f.firefox, 0);
+        f.actions.openNewWindow(f.firefox, 0);
         expect(f.firefox.launches).toEqual([['window', -1]]);
         const unrelated = f.makeWindow(f.terminal, 2, 1);
         const local = f.makeWindow(f.firefox, 3, 1); f.flush();
@@ -200,20 +232,22 @@ describe('Dash source queries and lifecycle', () => {
         expect(f.source.getAppWindows(f.firefox, 0)).toEqual([local]);
         expect(f.timeouts.size).toBe(0);
         expect(local.actor.signals.size).toBe(0);
-        f.source.destroy();
+        f.destroy();
     });
 
     it('launches actions in the same scope and supports simultaneous requests on different monitors', async () => {
         const f = await fixture();
         f.settings.set_boolean('monitor-only', true); f.flush();
-        f.source.launchAction(f.firefox, 'new-window', 0);
-        f.source.openNewWindow(f.firefox, 1);
+        const other = f.makeActions(1);
+        f.actions.launchAction(f.firefox, 'new-window');
+        other.openNewWindow(f.firefox);
         const one = f.makeWindow(f.firefox, 1, 1);
         const two = f.makeWindow(f.firefox, 2, 0); f.flush();
         expect(f.firefox.launches).toEqual([['new-window', 123, -1], ['window', -1]]);
         expect(one.moves).toEqual([0]);
         expect(two.moves).toEqual([1]);
-        f.source.destroy();
+        other.destroy();
+        f.destroy();
         expect(f.timeouts.size).toBe(0);
         expect(one.actor.signals.size).toBe(0);
         expect(two.actor.signals.size).toBe(0);
@@ -221,24 +255,24 @@ describe('Dash source queries and lifecycle', () => {
 
     it('unisolated launches leave native placement alone and expired launches cannot move later windows', async () => {
         const f = await fixture();
-        f.source.openNewWindow(f.firefox, 0);
+        f.actions.openNewWindow(f.firefox, 0);
         expect(f.timeouts.size).toBe(0);
         const remote = f.makeWindow(f.firefox, 1, 1); f.flush();
         expect(remote.moves).toEqual([]);
         f.settings.set_boolean('monitor-only', true); f.flush();
-        f.source.openNewWindow(f.firefox, 0); f.expire();
+        f.actions.openNewWindow(f.firefox, 0); f.expire();
         const later = f.makeWindow(f.firefox, 2, 1); f.flush();
         expect(later.moves).toEqual([]);
-        f.source.destroy();
+        f.destroy();
     });
 
     it('cleans up failed launches and never moves a window to a removed monitor', async () => {
         const f = await fixture();
         f.settings.set_boolean('monitor-only', true); f.flush();
         f.firefox.open_new_window = () => { throw new Error('Launch failed'); };
-        expect(() => f.source.openNewWindow(f.firefox, 0)).toThrowError('Launch failed');
+        expect(() => f.actions.openNewWindow(f.firefox, 0)).toThrowError('Launch failed');
         expect(f.timeouts.size).toBe(0);
-        f.source.openNewWindow(f.terminal, 1);
+        f.actions.openNewWindow(f.terminal, 1);
         f.display.get_n_monitors = () => 1;
         const window = f.makeWindow(f.terminal, 1, 0); f.flush();
         expect(window.moves).toEqual([]);
@@ -246,6 +280,6 @@ describe('Dash source queries and lifecycle', () => {
         expect(f.timeouts.size).toBe(0);
         expect(window.actor.signals.size).toBe(0);
         expect(window.signals.size).toBe(0);
-        f.source.destroy();
+        f.destroy();
     });
 });

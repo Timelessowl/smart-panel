@@ -1,5 +1,17 @@
 import * as Constants from '@/constant.js';
 
+// The native frame already provides the outer band; count it only once.
+export const CONTENT_PADDING = Math.max(0, Constants.DASH_PADDING - Constants.SECTION_FRAME_WIDTH);
+
+export function scaleDimension(value, scale = 1) {
+    return Math.round(value * scale);
+}
+
+export function contentInset(scale = 1) {
+    return scaleDimension(Constants.SECTION_BORDER_WIDTH + Constants.SECTION_FRAME_WIDTH +
+        CONTENT_PADDING + Constants.DASH_BORDER_WIDTH, scale);
+}
+
 function tokensFor(entries, count, iconSize, hiddenCount = 0) {
     const tokens = [{type: 'launchpad', width: Constants.DASH_ICON_SIZE + Constants.DASH_ITEM_INSET}];
     let hasSeparator = false;
@@ -66,4 +78,21 @@ export function expandedRows(entries, iconSize, usableWidth, scale = 1) {
         width += (width ? spacing : 0) + tokenWidth;
     }
     return rows;
+}
+
+export function expandedLayout(entries, iconSize, availableWidth, scale = 1) {
+    const rows = expandedRows(entries, iconSize, availableWidth - contentInset(scale) * 2, scale);
+    const height = scaleDimension(Constants.DASH_EXPANDED_ROW_HEIGHT, scale);
+    const spacing = scaleDimension(Constants.DASH_ITEM_SPACING, scale);
+    const placements = [];
+    rows.forEach((row, rowIndex) => {
+        let x = 0;
+        for (const token of row) {
+            placements.push({token, height, x, y: rowIndex * (height + spacing) +
+                (token.type === 'separator' ? (height - scaleDimension(iconSize, scale)) / 2 : 0)});
+            x += scaleDimension(token.width, scale) + spacing;
+        }
+    });
+    return {placements, width: Math.max(...rows.map(row => tokensWidth(row, scale))),
+        height: rows.length * height + (rows.length - 1) * spacing};
 }

@@ -65,6 +65,7 @@ async function fixture(scale = 1) {
     const chrome = new Set();
     const themeActors = new Set();
     const idles = new Map();
+    const timeouts = new Map();
     let nextIdle = 1;
     const DND = {
         DragMotionResult: {CONTINUE: 0, NO_DROP: 1, MOVE_DROP: 2},
@@ -76,12 +77,15 @@ async function fixture(scale = 1) {
     const imports = {
         'gi://Clutter': {default: {BinLayout: class {}, FixedLayout: class {},
             ActorAlign: {FILL: 0, CENTER: 1}, ClickAction: nativeMenus.ClickAction}},
-        'gi://GLib': {default: {PRIORITY_DEFAULT_IDLE: 0, SOURCE_REMOVE: false,
+        'gi://GLib': {default: {PRIORITY_DEFAULT_IDLE: 0, PRIORITY_DEFAULT: 0, SOURCE_REMOVE: false,
+            timeout_add: (_priority, _delay, callback) => {
+                const id = nextIdle++; timeouts.set(id, callback); return id;
+            },
             idle_add: (_priority, callback) => {
                 const id = nextIdle++;
                 idles.set(id, callback);
                 return id;
-            }, source_remove: id => idles.delete(id)}},
+            }, source_remove: id => { idles.delete(id); timeouts.delete(id); }}},
         'gi://GObject': {default: {registerClass: cls => cls}},
         'gi://Shell': {default: {util_set_hidden_from_pick: (actor, hidden) => {
             actor.hiddenFromPick = hidden;
@@ -90,6 +94,7 @@ async function fixture(scale = 1) {
             BoxLayout: Actor, Icon: Actor, Label: Actor, ScrollView: Actor, ButtonMask: {ONE: 1},
             PolicyType: {NEVER: 0, AUTOMATIC: 1}, Side: {BOTTOM: 1}}},
         'resource:///org/gnome/shell/ui/dnd.js': DND,
+        'resource:///org/gnome/shell/ui/appFavorites.js': {},
         'resource:///org/gnome/shell/ui/main.js': {activateWindow: win => activatedWindows.push(win), layoutManager: {
             addTopChrome: (actor, options) => { actor.chromeOptions = options; chrome.add(actor); },
             removeChrome: actor => chrome.delete(actor),
@@ -102,10 +107,17 @@ async function fixture(scale = 1) {
     };
     const {DashSection} = await GjsHarness.loadGjsModule(
         new URL('components/dashSection.js', GjsHarness.sourceDirectory), imports,
-        {global: {settings: {is_writable: () => true}, get_current_time: () => 123}});
+        {global: {display: {get_n_monitors: () => 2},
+            settings: {is_writable: () => true}, get_current_time: () => 123}});
+    const {DashSource} = await GjsHarness.loadGjsModule(
+        new URL('components/dash/dashSource.js', GjsHarness.sourceDirectory), imports);
     const theme = {addActor: actor => themeActors.add(actor),
         removeActor: actor => themeActors.delete(actor)};
-    const transient = {register: () => ({paused: false}), unregister() {}};
+    const registrations = new Set();
+    const transient = {register(actor, dismiss, relatedActors) {
+        const registration = {actor, dismiss, relatedActors, paused: false};
+        registrations.add(registration); return registration;
+    }, unregister: registration => registrations.delete(registration)};
     const app = appId => ({get_id: () => appId, get_name: () => appId,
         is_window_backed: () => false,
         can_open_new_window: () => true,
@@ -127,6 +139,7 @@ async function fixture(scale = 1) {
         },
         isFixedFavorite(id) { return ['firefox', 'files'].includes(id); },
         isFavorite(id) { return this.favorites.some(app => app.get_id() === id); },
+        canReorderFavorite(app) { return !this.isFixedFavorite(app.get_id()) && !app.is_window_backed(); },
         canSetFavorite(app) { return !this.isFixedFavorite(app.get_id()); },
         openNewWindow(app, monitor) { this.launches.push([app, monitor]); },
         launchAction(app, action, monitor) { this.desktopActions.push([app, action, monitor]); },
@@ -136,6 +149,7 @@ async function fixture(scale = 1) {
             this.panels.forEach(panel => { panel.refresh(); allocate(panel); });
         },
     };
+    Object.setPrototypeOf(source, DashSource.prototype);
     const makeWindow = (app, id, monitor = 0) => ({app, monitor, minimized: 0, deleted: [],
         get_stable_sequence: () => id, get_title: () => app.get_name(),
         get_monitor() { return this.monitor; },
@@ -204,15 +218,15 @@ async function fixture(scale = 1) {
         return kind === 'hover' ? DND.DragMotionResult.CONTINUE : false;
     }
     function finish(dragged) {
-        dragged._draggable.emit('drag-end');
+        dragged.draggable.emit('drag-end');
         for (const [id, callback] of idles) {
             idles.delete(id);
             callback();
         }
     }
-    const view = (section, appId) => [...section._views].find(icon => icon.item.appId === appId);
+    const view = (section, appId) => [...section._dragDrop._icons].find(icon => icon.item.appId === appId);
     return {panel, source, view, at, pick, dispatch, finish, monitors, chrome, themeActors,
-        DND, allocate, idles, activatedWindows, makeWindow};
+        DND, allocate, idles, timeouts, registrations, activatedWindows, makeWindow};
 }
 
 describe('Dash drag and drop', () => {
@@ -269,8 +283,10 @@ describe('Dash drag and drop', () => {
         f.source.windows = [remote, one, two];
         const p = f.panel(0);
         const entry = f.view(p, 'firefox').entry;
-        for (let click = 0; click < 3; click++)
+        for (let click = 0; click < 3; click++) {
             p.activateEntry(entry);
+            p.refresh();
+        }
         expect(f.activatedWindows).toEqual([one, two]);
         expect(one.minimized).toBe(1);
         expect(two.minimized).toBe(1);
@@ -282,7 +298,7 @@ describe('Dash drag and drop', () => {
         const p = f.panel();
         const other = f.panel(1);
         const dragged = f.view(p, 'calendar');
-        dragged._draggable.emit('drag-begin');
+        dragged.draggable.emit('drag-begin');
         const removed = f.source.running.find(app => app.get_id() === 'settings');
         f.source.running = f.source.running.filter(app => app !== removed);
         f.source.windows = f.source.windows.filter(win => win.app !== removed);
@@ -307,7 +323,7 @@ describe('Dash drag and drop', () => {
         const other = f.panel(1);
         const dragged = f.view(p, 'terminal');
         const target = f.view(p, 'files');
-        dragged._draggable.emit('drag-begin');
+        dragged.draggable.emit('drag-begin');
         expect(p.get_children()).toEqual([p._surface]);
         expect(p._surface.get_children()).toEqual([p._frame]);
         expect(p._frame.get_children()).toEqual([p._dash]);
@@ -318,8 +334,8 @@ describe('Dash drag and drop', () => {
         f.finish(dragged);
         expect(p._dragDrop._dragging).toBe(false);
         expect(f.source.changes).toEqual([['terminal', true]]);
-        expect(Array.from(p._projection.favorites, entry => entry.item.appId)).toEqual(['firefox', 'files', 'terminal', 'editor', 'music']);
-        expect(Array.from(other._projection.favorites, entry => entry.item.appId)).toEqual(['firefox', 'files', 'editor', 'music', 'terminal']);
+        expect(Array.from(p._dragDrop._entries.favorites, entry => entry.item.appId)).toEqual(['firefox', 'files', 'terminal', 'editor', 'music']);
+        expect(Array.from(other._dragDrop._entries.favorites, entry => entry.item.appId)).toEqual(['firefox', 'files', 'editor', 'music', 'terminal']);
     });
 
     it('running and non-fixed favorite reordering is panel-local; fixed launchers stay fixed', async () => {
@@ -328,15 +344,15 @@ describe('Dash drag and drop', () => {
         const other = f.panel(1);
         for (const [from, to] of [['calendar', 'terminal'], ['music', 'editor']]) {
             const dragged = f.view(p, from);
-            dragged._draggable.emit('drag-begin');
+            dragged.draggable.emit('drag-begin');
             expect(f.dispatch('drop', dragged, p, f.at(f.view(p, to)))).toBe(true);
             f.finish(dragged);
         }
-        expect(Array.from(p._projection.running, entry => entry.item.appId)).toEqual(['calendar', 'terminal', 'settings']);
-        expect(Array.from(other._projection.running, entry => entry.item.appId)).toEqual(['terminal', 'settings', 'calendar']);
-        expect(Array.from(p._projection.favorites, entry => entry.item.appId)).toEqual(['firefox', 'files', 'music', 'editor']);
+        expect(Array.from(p._dragDrop._entries.running, entry => entry.item.appId)).toEqual(['calendar', 'terminal', 'settings']);
+        expect(Array.from(other._dragDrop._entries.running, entry => entry.item.appId)).toEqual(['terminal', 'settings', 'calendar']);
+        expect(Array.from(p._dragDrop._entries.favorites, entry => entry.item.appId)).toEqual(['firefox', 'files', 'music', 'editor']);
         expect(f.source.changes).toEqual([]);
-        expect(f.view(p, 'files')._draggable).toBe(undefined);
+        expect(f.view(p, 'files').draggable).toBe(undefined);
         expect(f.dispatch('drop', f.view(p, 'terminal'), p, f.at(f.view(p, 'firefox')))).toBe(false);
     });
 
@@ -347,7 +363,7 @@ describe('Dash drag and drop', () => {
             const dragged = f.view(p, 'terminal');
             const target = f.view(p, 'editor');
             const originalWidth = p.width;
-            dragged._draggable.emit('drag-begin');
+            dragged.draggable.emit('drag-begin');
             expect(f.dispatch('hover', dragged, p, f.at(target))).withContext(`preview at scale ${scale}`).toBe(f.DND.DragMotionResult.MOVE_DROP);
             const preview = p._dragDrop._dropPreview;
             const beforeX = preview.x;
@@ -377,7 +393,7 @@ describe('Dash drag and drop', () => {
         const p = f.panel();
         const dragged = f.view(p, 'settings');
         const target = f.view(p, 'calendar');
-        dragged._draggable.emit('drag-begin');
+        dragged.draggable.emit('drag-begin');
         const [x] = target.get_transformed_position();
         const paddingPoint = [x + target.width * 0.75, p.y];
         expect(f.pick(p, ...paddingPoint)).toBe(p._frame);
@@ -392,14 +408,15 @@ describe('Dash drag and drop', () => {
         expect(f.dispatch('drop', dragged, p, paddingPoint)).toBe(true);
         expect(p._dragDrop._dropPreview).toBe(null);
         f.finish(dragged);
-        expect(Array.from(p._projection.running, entry => entry.item.appId)).toEqual(['terminal', 'calendar', 'settings']);
+        expect(Array.from(p._dragDrop._entries.running, entry => entry.item.appId)).toEqual(['terminal', 'calendar', 'settings']);
         const newDragged = f.view(p, 'settings');
-        newDragged._draggable.emit('drag-begin');
+        newDragged.draggable.emit('drag-begin');
         // Explicit section fallback models a pick on the border/background itself.
         const beforeTarget = f.view(p, 'terminal');
         const [tx, ty] = beforeTarget.get_transformed_position();
         expect(p._delegate.handleDragOver(newDragged, null, tx - p.x, ty - p.y)).toBe(f.DND.DragMotionResult.MOVE_DROP);
         p.destroy();
+        expect(p._dragDrop.drop(newDragged, beforeTarget.entry, false)).toBe(false);
         expect(p._dragDrop._dragging).toBe(false);
         expect(f.monitors.size).toBe(0);
         expect(f.chrome.size).toBe(0);
@@ -422,10 +439,10 @@ describe('Dash drag and drop', () => {
         surface._content.set_size(surface.width - frame * 2, surface.height - frame * 2);
         surface._content.child.set_size(surface._content.width, surface._content.height);
         grid.set_position(Constants.DASH_BORDER_WIDTH, Constants.DASH_BORDER_WIDTH);
-        const views = [...p._views].filter(icon => grid.contains(icon));
+        const views = [...p._dragDrop._icons].filter(icon => grid.contains(icon));
         const dragged = views.find(icon => icon.item.appId === 'calendar');
         const target = views.find(icon => icon.item.appId === 'terminal');
-        dragged._draggable.emit('drag-begin');
+        dragged.draggable.emit('drag-begin');
         expect(f.dispatch('hover', dragged, surface, f.at(target))).toBe(f.DND.DragMotionResult.MOVE_DROP);
         expect(p._dragDrop._dropPreview).toBeTruthy();
         const [x, y] = target.get_transformed_position();
@@ -436,6 +453,45 @@ describe('Dash drag and drop', () => {
         expect(p._expandedSurface).toBe(null);
         expect(p._dragDrop._dropPreview).toBe(null);
         expect(p._dragDrop._dragging).toBe(false);
-        expect(Array.from(p._projection.running, entry => entry.item.appId)).toEqual(['calendar', 'terminal', 'settings']);
+        expect(Array.from(p._dragDrop._entries.running, entry => entry.item.appId)).toEqual(['calendar', 'terminal', 'settings']);
+    });
+
+    it('expanded dismissal, reopening and panel destruction release menus and transient resources', async () => {
+        for (const scale of [1, 1.5, 2]) {
+            const f = await fixture(scale);
+            const p = f.panel(0, 250 * scale);
+            p._openExpanded();
+            const expanded = p._expandedSurface;
+            const registration = [...f.registrations][0];
+            expect(expanded.width).toBeLessThanOrEqual(250 * scale);
+            expect(expanded.height).toBeLessThanOrEqual(600 * scale);
+            expect(p._dash.visible).toBe(false);
+            const icon = [...p._dragDrop._icons].find(view => view.draggable && expanded.contains(view));
+            icon.menu.open();
+            expect(registration.relatedActors.has(icon.menu.actor)).toBe(true);
+            icon.draggable.emit('drag-begin');
+            expect(registration.paused).toBe(true);
+            f.finish(icon);
+            expect(registration.paused).toBe(false);
+            icon.menu.open();
+            registration.dismiss();
+            expect(p._expandedSurface).toBe(null);
+            expect(p._dash.visible).toBe(true);
+            expect(icon.menu.destroyed).toBe(true);
+            expect(f.registrations.size).toBe(0);
+            expect(f.chrome.size).toBe(0);
+            expect(f.themeActors.size).toBe(0);
+            expect(p._dragDrop._expandedSurface).toBe(null);
+            expanded.destroy();
+            p._openExpanded();
+            expect(p._expandedSurface).not.toBe(expanded);
+            expect(f.registrations.size).toBe(1);
+            p.destroy();
+            expect(f.registrations.size).toBe(0);
+            expect(f.chrome.size).toBe(0);
+            expect(f.themeActors.size).toBe(0);
+            expect(f.monitors.size).toBe(0);
+            expect(f.idles.size).toBe(0);
+        }
     });
 });

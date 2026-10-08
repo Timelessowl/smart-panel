@@ -95,13 +95,18 @@ one, while X11 uses that monitor's `geometry_scale`.
 
 ## Dash
 
-`src/components/dash/` contains one Shell-observing `DashSource`, the `DashIcon`
-view, and independent projection, layout, activation, drag/drop, and launch logic.
+`src/components/dash/` contains one Shell-observing `DashSource`, native `DashIcon`
+views, `ExpandedDash`, and dash layout, action and drag/drop helpers.
 The source exposes native `Shell.App` and `Meta.Window` objects through
 `getFavorites()`, `getRunningApps()`, `getOpenedWindows()`,
 `getOpenMonitorWindows(monitor)`, and `getAppWindows(app, monitor)`.
-`DashSection` owns its views and session-only drag order;
-`BottomPanel` remains the authority for its allocated bounds.
+`getEntries({monitor, favoriteOrder, runningOrder})` returns complete monitor-scoped
+favorite/running entries. `DashActions` in `dashUtils.js` owns each dash's activation
+cycle; `DashLaunches` shares pending launch placement through the source so concurrent
+monitor requests cannot claim the same window. `ExpandedDash` extends `BaseSection`
+and owns its grid, scrolling and transient cleanup. `DashSection` assembles the
+collapsed view and shares token creation with expansion. `DashDragDrop` owns session-only
+local order; `BottomPanel` remains the authority for allocated bounds.
 
 Launchpad toggles overview and always uses a 40px icon. Favorites follow GNOME's
 list, with Firefox and Files fixed first. They cannot be removed or dragged.
@@ -129,7 +134,7 @@ from GNOME's `PanelMenu.Button` and use its standard popup menu, with desktop-fi
 actions and favorite/unfavorite controls. A shared native menu manager handles
 menu switching and grabs. Left-click still activates apps; right-click opens the
 menu. `DashDragDrop` owns draggable setup, drop delegates, previews, local order,
-and deferred refresh, leaving `DashSection` to assemble and activate the dash. Dragging
+and deferred refresh, leaving `DashSection` to assemble the dash and delegate actions. Dragging
 reorders within a subsection on that monitor only; dragging a running item into
 Favorites adds it to GNOME's system favorites. Local ordering is not persisted.
 Valid drop targets show a translucent 16px app-icon preview at the insertion

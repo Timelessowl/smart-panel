@@ -5,6 +5,7 @@ import * as DND from '@girs/gnome-shell/ui/dnd';
 import * as Main from '@girs/gnome-shell/ui/main';
 import * as Constants from '@/constant.js';
 import {DashIcon} from '@/components/dash/dashIcon.js';
+import * as DashLayout from '@/components/dash/dashLayout.js';
 
 // One controller per dash: Shell drag plumbing, temporary previews and local
 // ordering live here. Shared application/window state keeps updating normally.
@@ -17,9 +18,8 @@ export class DashDragDrop {
         this._onChanged = onChanged;
         this.orders = {favoriteOrder: [], runningOrder: []};
         this._icons = new Set();
-        this._projection = null;
+        this._entries = null;
         this._expandedSurface = null;
-        this._dismissRegistration = null;
         this._dropId = 0;
         this._dragging = false;
         this._refreshPending = false;
@@ -45,8 +45,8 @@ export class DashDragDrop {
         section.connect('destroy', () => this.destroy());
     }
 
-    updateProjection(projection) {
-        this._projection = projection;
+    updateEntries(entries) {
+        this._entries = entries;
     }
 
     deferRefresh() {
@@ -58,54 +58,51 @@ export class DashDragDrop {
         return false;
     }
 
-    setExpandedSurface(surface, registration = null) {
+    setExpandedSurface(surface) {
         this.clearPreview();
-        if (this._dismissRegistration)
-            this._dismissRegistration.paused = false;
+        this._expandedSurface?.setDragging(false);
         this._expandedSurface = surface;
-        this._dismissRegistration = registration;
-        if (registration)
-            registration.paused = this._dragging;
+        surface?.setDragging(this._dragging);
     }
 
     attachIcon(icon) {
         this._icons.add(icon);
         icon.dragDrop = this;
         if (!(icon.entry.hardcoded && icon.entry.group === 'favorites')) {
-            icon._draggable = DND.makeDraggable(icon, {restoreOnSuccess: false});
-            icon._draggable.connect('drag-begin', () => this._dragStarted(icon));
-            icon._draggable.connect('drag-end', () => {
-                if (icon._dragging)
+            icon.draggable = DND.makeDraggable(icon, {restoreOnSuccess: false});
+            icon.draggable.connect('drag-begin', () => this._dragStarted(icon));
+            icon.draggable.connect('drag-end', () => {
+                if (icon.dragging)
                     this._dragEnded(icon);
             });
         }
         icon.connect('destroy', () => {
             this._icons.delete(icon);
-            if (!this._destroyed && icon._dragging)
+            if (!this._destroyed && icon.dragging)
                 this._dragEnded(icon);
             icon.dragDrop = null;
         });
     }
 
     _scale(value) {
-        return Math.round(value * this._scaleFactor);
+        return DashLayout.scaleDimension(value, this._scaleFactor);
     }
 
     _dragStarted(icon) {
-        icon._dragging = true;
-        icon.menu.close();
-        icon._clickAction.release();
+        if (this._destroyed)
+            return;
+        icon.setDragging(true);
         this._dragging = true;
-        if (this._dismissRegistration)
-            this._dismissRegistration.paused = true;
+        this._expandedSurface?.setDragging(true);
     }
 
     _dragEnded(icon) {
-        icon._dragging = false;
+        icon.setDragging(false);
+        if (this._destroyed)
+            return;
         this._dragging = false;
         this.clearPreview();
-        if (this._dismissRegistration)
-            this._dismissRegistration.paused = false;
+        this._expandedSurface?.setDragging(false);
         // DND releases its actors after drag-end callbacks return. Only this
         // view's rebuild waits; shared state and other monitors stay current.
         if (this._refreshPending && !this._dragRefreshId) {
@@ -178,15 +175,17 @@ export class DashDragDrop {
     }
 
     _canDrop(source, target, after) {
+        if (this._destroyed)
+            return false;
         const entry = source instanceof DashIcon ? source.entry : null;
         if (!entry || (entry.group === 'favorites' && entry.hardcoded))
             return false;
         if (target.group === 'running')
             return entry.group === 'running';
-        if (entry.hardcoded || entry.item.app.is_window_backed() ||
+        if (!this._source.canReorderFavorite(entry.item.app) ||
             (!this._source.isFavorite(entry.item.appId) && !this._source.canSetFavorite(entry.item.app)))
             return false;
-        const fixed = this._projection.favorites.filter(item => item.hardcoded);
+        const fixed = this._entries.favorites.filter(item => item.hardcoded);
         return !target.hardcoded || (after && target === fixed.at(-1));
     }
 
@@ -200,7 +199,7 @@ export class DashDragDrop {
     }
 
     _showDropPreview(source, targetView, after) {
-        if (this._previewDraggable !== source._draggable)
+        if (this._previewDraggable !== source.draggable)
             this.clearPreview();
         const size = this._scale(Constants.DASH_DROP_PREVIEW_SIZE);
         if (!this._dropPreview) {
@@ -214,7 +213,7 @@ export class DashDragDrop {
             Main.layoutManager.addTopChrome(this._dropPreview, {
                 affectsInputRegion: false, affectsStruts: false, trackFullscreen: true,
             });
-            this._previewDraggable = source._draggable;
+            this._previewDraggable = source.draggable;
             this._previewDragEndId = this._previewDraggable.connect('drag-end', () =>
                 this.clearPreview());
         }
@@ -255,7 +254,7 @@ export class DashDragDrop {
         this._dropId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
             this._dropId = 0;
             const favorites = target.group === 'favorites';
-            const entries = this._projection[target.group];
+            const entries = this._entries[target.group];
             const key = item => favorites ? item.item.appId : item.item.id;
             const order = entries.map(key);
             const sourceKey = key(entry);
@@ -267,9 +266,7 @@ export class DashDragDrop {
             }
             if (favorites && !this._source.isFavorite(entry.item.appId))
                 this._source.setFavorite(entry.item.app, true);
-            else
-                this._onChanged();
-            if (this._refreshPending && !this._dragRefreshId)
+            else if (!this._dragRefreshId)
                 this._onChanged();
             return GLib.SOURCE_REMOVE;
         });

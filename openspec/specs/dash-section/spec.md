@@ -23,7 +23,9 @@ than mock population controls. Metadata and window changes SHALL update the
 presentation. Focusing another app SHALL NOT reorder running icons by recency.
 One shared source SHALL expose favorites, running apps, eligible open windows,
 and windows by monitor through explicit queries returning native Shell objects.
-Monitor views SHALL own rendering entries and local order.
+The source SHALL derive complete monitor-specific rendering entries through
+`getEntries({monitor, favoriteOrder, runningOrder})`. Monitor views SHALL own actors
+and local order; entry derivation SHALL NOT modify shared state.
 
 #### Scenario: Running window changes
 
@@ -200,7 +202,9 @@ Clicking `+N` SHALL show the full item set in multiple rows expanding upward
 from the dash, above application windows, with its opaque themed surface and
 frame intact. Overflow SHALL become real items in the expanded layout. Expansion
 SHALL stay within the available dash width and usable monitor height; excess
-vertical content SHALL be scrollable.
+vertical content SHALL be scrollable. A dedicated `ExpandedDash` subclass of
+`BaseSection` SHALL own expanded content, scrolling, transient registrations and
+cleanup, using the same token creation path as the collapsed dash.
 
 #### Scenario: Hidden items are revealed
 
@@ -253,6 +257,10 @@ specific window; clicking an idle favorite SHALL open a new app window.
 - **THEN** that second window is focused rather than cycling among all app windows.
 
 ### Requirement: App context actions
+
+App icons SHALL derive from GNOME's PanelMenu.Button and use a standard popup
+menu with native lifecycle and a shared menu manager. Drag/drop handling SHALL
+reside in a separate dash module.
 
 Right-clicking an app/window icon SHALL open its available desktop-file actions.
 It SHALL offer a new-window action when supported and not already present,

@@ -5,7 +5,7 @@
 The contract is [dash-section](../../specs/dash-section/spec.md). This design
 records the current real-dash implementation and its clarified behavior, not
 the removed mock-app architecture. Automated coverage exists for native identity,
-projection, layout, activation, source lifecycle, dot allocation, drag/drop,
+source entries, layout, activation, source lifecycle, dot allocation, drag/drop,
 and expansion dismissal. All use Jasmine suites with Node/GJS API doubles; native Shell
 acceptance is a separate remaining task.
 
@@ -28,24 +28,24 @@ state and another refresh lifecycle. Adding menus to these wrappers would mix
 monitor-specific policy into shared objects. Native objects already provide
 stable identity, metadata, icon creation, and operations.
 
-`DashSource` owns observation and eligible-window state. `DashSection` supplies
-monitor-scoped windows to the projection, which builds disposable rendering
-entries holding native references and display labels. `DashIcon` renders those
-entries. `DashIcon` adds actions directly to its standard native popup menu;
-`appActivation` selects click actions; `DashLauncher` handles the asynchronous
-placement of newly launched windows. No replacement model classes are needed.
+`DashSource` owns observation, eligible-window state and complete entry construction.
+`getEntries()` applies monitor scope, mode, local order and indicator rules internally;
+there is no separate projection module. Entries retain native app/window references
+without duplicate window fields. `DashIcon` renders entries and fills a standard
+native popup menu. `dashUtils` contains `DashActions` for monitor-local activation
+and `DashLaunches` for shared pending launches. No replacement model classes are needed.
 
-### One source, independent projections
+### One source, monitor-specific entries
 
 The extension owns one `DashSource`, which observes Shell AppSystem,
 WindowTracker, AppFavorites, window events, and the two settings. It reuses
 native app/window references and coalesces refreshes. It exposes
 `getFavorites()`, `getRunningApps()`, `getOpenedWindows()`,
 `getOpenMonitorWindows(monitor)`, `getAppWindows(app, monitor)`, and
-`getWindowApp(window)`. Returned collections are copies. Each `DashSection`
-queries its monitor scope and calls `projectDash()` with native references and
-local order arrays. App-wide metadata is shared; projected
-windows, indicator counts, views, expansion, and activation cycle are local.
+`getWindowApp(window)` and `getEntries({monitor, favoriteOrder, runningOrder})`.
+Returned collections are copies. Each `DashSection` requests complete entries;
+it does not reconstruct app/window maps or fixed-favorite sets. App-wide metadata
+is shared; entries, views, local order, expansion and activation cycles are monitor-specific.
 MonitorManager subscriptions trigger per-panel refreshes and geometry updates.
 
 The source checks Firefox IDs in order: `firefox.desktop`, `firefox-esr.desktop`,
@@ -55,7 +55,7 @@ is outside this baseline. Fixed favorites are deduplicated from the system list.
 Running app order is derived from oldest eligible stable window sequence, with
 app ID as tie-breaker, rather than Shell's MRU order.
 
-### Projection owns membership, not activation
+### The source derives membership and indicators
 
 Per-app mode excludes favorite apps from running. Per-window mode uses the
 oldest visible native window in a favorite slot, falling back to the app when idle;
@@ -77,7 +77,12 @@ padding extending beyond that band, and the content's thin border, once each.
 The opaque dash child's CSS padding does not duplicate its parent's frame.
 Collapsed row height fits inside the content border without changing icon sizes.
 The running separator exists only with running items and stays with the first
-running token when `expandedRows()` wraps. On exceptionally narrow allocations
+running token when `expandedRows()` wraps. `expandedLayout()` supplies positions and
+bounds as well as rows, so expanded actors do not repeat layout arithmetic.
+`ExpandedDash` extends `BaseSection` and owns the expanded grid, scroll view,
+chrome, theme and dismissal registrations. `DashSection` only opens/closes it and
+provides the same token factory used by the collapsed view. DND requests dismissal
+suspension through `setDragging()`, without owning the transient registration. On exceptionally narrow allocations
 the section clips rather than invading search; no extra behavior is invented.
 
 ### Dots are an allocation overlay
@@ -113,7 +118,7 @@ focus or minimize a window that has moved off its monitor. Empty favorites
 request a new window; with monitor filtering they never select a remote window.
 
 Shell's `open_new_window()` and `launch_action()` have a workspace argument but
-no monitor argument. `DashLauncher` records pre-launch windows and observes the
+no monitor argument. `DashLaunches` records pre-launch windows and observes the
 first new eligible window for each requested app. It moves only that new window
 to the requested monitor, and repeats placement on its first frame to account
 for initial mapping. Existing windows are excluded; simultaneous requests claim
@@ -144,7 +149,7 @@ when filling the popup directly.
 
 `DashDragDrop` owns one controller per section: native draggable setup, drag
 monitoring, drop validation, insertion previews, temporary local orders and
-post-release refresh. `DashSection` supplies projection and surface updates and
+post-release refresh. `DashSection` supplies source entries and `ExpandedDash` supplies surface updates; the section
 receives one change callback. It contains no Shell DND plumbing or drag timers.
 
 Native DND uses the icon's `_delegate`. Icon delegates accept before/after drops;
