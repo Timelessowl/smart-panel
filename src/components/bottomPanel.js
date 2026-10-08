@@ -48,7 +48,6 @@ export class BottomPanel extends St.Widget {
             transientInputManager,
             this._scaleFactor
         );
-        this._dashSection.onOrderChanged = () => this.refreshDash();
         this._searchSection = new SearchSection();
         this._indicatorSection = new IndicatorSection(
             indicators,
@@ -67,6 +66,7 @@ export class BottomPanel extends St.Widget {
         for (const component of this._components)
             this.add_child(component);
 
+        this._dashSection.connectObject('layout-changed', this._updateGeometry.bind(this), this);
         this._updateGeometry();
 
         Main.layoutManager.addChrome(this, {
@@ -164,11 +164,6 @@ export class BottomPanel extends St.Widget {
     _placeFromEnd(section, endOffset, y, width, height) {
         const x = this.width - endOffset - width;
         this._place(section, x, y, width, height);
-    }
-
-    refreshDash() {
-        this._dashSection.refresh();
-        this._updateGeometry();
     }
 
     setIndicators(indicators) {

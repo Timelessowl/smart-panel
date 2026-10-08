@@ -10,12 +10,11 @@ import * as DashLayout from '@/components/dash/dashLayout.js';
 // One controller per dash: Shell drag plumbing, temporary previews and local
 // ordering live here. Shared application/window state keeps updating normally.
 export class DashDragDrop {
-    constructor(section, source, themeManager, scaleFactor, onChanged) {
+    constructor(section, source, themeManager, scaleFactor) {
         this._section = section;
         this._source = source;
         this._themeManager = themeManager;
         this._scaleFactor = scaleFactor;
-        this._onChanged = onChanged;
         this.orders = {favoriteOrder: [], runningOrder: []};
         this._icons = new Set();
         this._entries = null;
@@ -108,7 +107,7 @@ export class DashDragDrop {
         if (this._refreshPending && !this._dragRefreshId) {
             this._dragRefreshId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                 this._dragRefreshId = 0;
-                this._onChanged();
+                this._section.refresh();
                 return GLib.SOURCE_REMOVE;
             });
         }
@@ -267,7 +266,7 @@ export class DashDragDrop {
             if (favorites && !this._source.isFavorite(entry.item.appId))
                 this._source.setFavorite(entry.item.app, true);
             else if (!this._dragRefreshId)
-                this._onChanged();
+                this._section.refresh();
             return GLib.SOURCE_REMOVE;
         });
         return true;
@@ -290,6 +289,5 @@ export class DashDragDrop {
         this._icons.clear();
         this._section = null;
         this._source = null;
-        this._onChanged = null;
     }
 }

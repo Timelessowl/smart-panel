@@ -1,4 +1,5 @@
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import Shell from 'gi://Shell';
 import * as AppFavorites from '@girs/gnome-shell/ui/appFavorites';
 import {DashLaunches} from '@/components/dash/dashUtils.js';
@@ -10,8 +11,13 @@ const FIXED_APP_IDS = [
 
 // Shared Shell state. Queries return native apps/windows; actors and drag order
 // belong to each DashSection and never suspend this source's observations.
-export class DashSource {
+export class DashSource extends GObject.Object {
+    static {
+        GObject.registerClass({Signals: {changed: {}}}, this);
+    }
+
     constructor(settings) {
+        super();
         this._settings = settings;
         this._appSystem = Shell.AppSystem.get_default();
         this._favorites = AppFavorites.getAppFavorites();
@@ -20,7 +26,6 @@ export class DashSource {
         this._apps = new Map();
         this._windows = new Map();
         this._connections = [];
-        this._listeners = new Set();
         this._refreshId = 0;
         this._connect(this._appSystem, 'installed-changed');
         this._connect(this._appSystem, 'app-state-changed');
@@ -36,11 +41,6 @@ export class DashSource {
 
     _connect(object, signal, connections = this._connections) {
         connections.push([object, object.connect(signal, () => this._queueRefresh())]);
-    }
-
-    subscribe(callback) {
-        this._listeners.add(callback);
-        return () => this._listeners.delete(callback);
     }
 
     get perWindow() { return this._state.perWindow; }
@@ -213,8 +213,7 @@ export class DashSource {
         this._state = {favorites, running, windows, fixedIds,
             perWindow: this._settings.get_boolean('per-window-mode'),
             monitorOnly: this._settings.get_boolean('monitor-only')};
-        for (const listener of this._listeners)
-            listener();
+        this.emit('changed');
     }
 
     _disconnect(connections) {
@@ -226,7 +225,6 @@ export class DashSource {
         if (this._refreshId)
             GLib.source_remove(this._refreshId);
         this._refreshId = 0;
-        this._listeners.clear();
         this._launches.destroy();
         this._disconnect(this._connections);
         for (const connections of this._apps.values())
@@ -236,5 +234,6 @@ export class DashSource {
         this._apps.clear();
         this._windows.clear();
         this._connections = [];
+        this.run_dispose();
     }
 }

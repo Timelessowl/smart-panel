@@ -43,6 +43,7 @@ export class SignalObject {
     constructor() {
         this.signals = new Map();
         this.nextId = 1;
+        this._objectConnections = new Map();
     }
 
     connect(signal, callback) {
@@ -56,10 +57,46 @@ export class SignalObject {
             throw new Error(`Unknown signal ${id}`);
     }
 
+    // Model Shell's owner-bound connections: destruction disconnects only the
+    // owner's handlers, including multiple handlers attached to one emitter.
+    connectObject(signal, callback, owner) {
+        let record = this._objectConnections.get(owner);
+        if (!record) {
+            record = {ids: new Set(), destroyId: owner.connect('destroy', () =>
+                this.disconnectObject(owner))};
+            this._objectConnections.set(owner, record);
+        }
+        record.ids.add(this.connect(signal, callback));
+    }
+
+    disconnectObject(owner) {
+        const record = this._objectConnections.get(owner);
+        if (!record)
+            return;
+        this._objectConnections.delete(owner);
+        for (const id of record.ids)
+            this.disconnect(id);
+        owner.disconnect(record.destroyId);
+    }
+
+    run_dispose() {
+        for (const owner of this._objectConnections.keys())
+            this.disconnectObject(owner);
+        this.signals.clear();
+    }
+
     emit(signal, ...args) {
-        for (const record of [...this.signals.values()]) {
-            if (record.signal === signal)
+        for (const [id, record] of [...this.signals]) {
+            if (this.signals.has(id) && record.signal === signal)
                 record.callback(this, ...args);
         }
     }
+}
+
+export function createGObjectDouble() {
+    return {Object: SignalObject, registerClass(metadata, klass = metadata) {
+        if (metadata.Signals)
+            klass.signalDefinitions = metadata.Signals;
+        return klass;
+    }};
 }

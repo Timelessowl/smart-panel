@@ -95,7 +95,7 @@ one, while X11 uses that monitor's `geometry_scale`.
 
 ## Dash
 
-`src/components/dash/` contains one Shell-observing `DashSource`, native `DashIcon`
+`src/components/dash/` contains one Shell-observing GObject `DashSource`, native `DashIcon`
 views, `ExpandedDash`, and dash layout, action and drag/drop helpers.
 The source exposes native `Shell.App` and `Meta.Window` objects through
 `getFavorites()`, `getRunningApps()`, `getOpenedWindows()`,
@@ -106,7 +106,11 @@ cycle; `DashLaunches` shares pending launch placement through the source so conc
 monitor requests cannot claim the same window. `ExpandedDash` extends `BaseSection`
 and owns its grid, scrolling and transient cleanup. `DashSection` assembles the
 collapsed view and shares token creation with expansion. `DashDragDrop` owns session-only
-local order; `BottomPanel` remains the authority for allocated bounds.
+local order; `BottomPanel` remains the authority for allocated bounds. Each
+`DashSection` connects to the source's `changed` signal with `connectObject`,
+which disconnects when that section is destroyed. `BottomPanel` similarly listens
+to the section's `layout-changed` signal to update its allocated width.
+`MonitorManager` only creates and destroys monitor panels; it does not relay dash updates.
 
 Launchpad toggles overview and always uses a 40px icon. Favorites follow GNOME's
 list, with Firefox and Files fixed first. They cannot be removed or dragged.

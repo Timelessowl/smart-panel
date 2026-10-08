@@ -85,4 +85,16 @@ describe('Content and border geometry', () => {
         expect(panel._debianButton.width).toBe(Constants.SECTION_HEIGHT + (Constants.SECTION_FRAME_WIDTH + Constants.SECTION_BORDER_WIDTH) * 2);
         expect(panel._scaleFactor).toBe(1);
     });
+
+    it('updates allocated dash width from the section signal without refreshing its source', async () => {
+        const {panel} = await fixture(true, 1);
+        const searchX = panel._searchSection.x;
+        panel._dashSection.preferredWidth = 300;
+        panel._dashSection.emit('layout-changed');
+        expect(panel._dashSection.width).toBe(300);
+        expect(panel._searchSection.x).toBe(searchX);
+        panel._dashSection.preferredWidth = 10000;
+        panel._dashSection.emit('layout-changed');
+        expect(panel._dashSection.width).toBe(panel._dashSection.availableSize[0]);
+    });
 });

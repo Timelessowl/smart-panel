@@ -16,11 +16,6 @@ export class MonitorManager {
             'monitors-changed',
             () => this._rebuildPanels()
         );
-        this._unsubscribeDash = dashSource.subscribe(() => {
-            for (const panel of this._panels)
-                panel.refreshDash();
-        });
-
         this._rebuildPanels();
     }
 
@@ -57,7 +52,6 @@ export class MonitorManager {
     }
 
     destroy() {
-        this._unsubscribeDash();
         if (this._monitorsChangedId) {
             Main.layoutManager.disconnect(this._monitorsChangedId);
             this._monitorsChangedId = 0;

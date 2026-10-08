@@ -71,6 +71,7 @@ async function fixture() {
     const tracker = new SignalObject();
     const imports = {
         'gi://GLib': {default: GLib},
+        'gi://GObject': {default: GjsHarness.createGObjectDouble()},
         'gi://Shell': {default: {AppSystem: {get_default: () => appSystem},
             WindowTracker: {get_default: () => tracker}}},
         'resource:///org/gnome/shell/ui/main.js': {activateWindow() {}},
@@ -198,14 +199,18 @@ describe('Dash source queries and lifecycle', () => {
     it('coalesces updates without a global pause and disconnects pending work on shutdown', async () => {
         const f = await fixture();
         let updates = 0;
-        const unsubscribe = f.source.subscribe(() => updates++);
+        const listener = new SignalObject();
+        f.source.connectObject('changed', () => updates++, listener);
         const window = f.makeWindow(f.terminal, 1); f.flush();
         expect(updates).toBe(1);
         expect(f.source.pause).toBeUndefined();
         expect(f.source.resume).toBeUndefined();
         f.terminal.windows = []; window.emit('unmanaged'); f.flush();
         expect(window.signals.size).toBe(0);
-        unsubscribe();
+        listener.emit('destroy');
+        f.appSystem.emit('installed-changed'); f.flush();
+        expect(updates).toBe(2);
+        expect(f.source.signals.size).toBe(0);
         f.appSystem.emit('installed-changed');
         expect(f.sources.size).toBe(1);
         f.destroy();

@@ -14,14 +14,13 @@ import {ExpandedDash} from '@/components/dash/expandedDash.js';
 
 export class DashSection extends BaseSection {
     static {
-        GObject.registerClass(this);
+        GObject.registerClass({Signals: {'layout-changed': {}}}, this);
     }
 
     constructor(source, monitorIndex, themeManager, transientInputManager, scaleFactor = 1) {
         super();
         this.canExpand = true;
         this.preferredWidth = 0;
-        this.onOrderChanged = null;
         this._source = source;
         this._monitorIndex = monitorIndex;
         this._themeManager = themeManager;
@@ -33,15 +32,11 @@ export class DashSection extends BaseSection {
         this._menuActors = new Set();
         this._actions = new DashActions(source, monitorIndex);
         this._menuManager = new PopupMenu.PopupMenuManager(this);
-        this._dragDrop = new DashDragDrop(this, source, themeManager, scaleFactor, () => {
-            if (this.onOrderChanged)
-                this.onOrderChanged();
-            else
-                this.refresh();
-        });
+        this._dragDrop = new DashDragDrop(this, source, themeManager, scaleFactor);
         this._dash = new St.BoxLayout({style_class: 'dash-section',
             style: `padding: 0 ${DashLayout.CONTENT_PADDING}px; spacing: ${Constants.DASH_ITEM_SPACING}px;`});
         this.setSectionContent(this._dash);
+        source.connectObject('changed', this.refresh.bind(this), this);
         this.refresh();
     }
 
@@ -67,6 +62,7 @@ export class DashSection extends BaseSection {
     }
 
     _rebuildCollapsed() {
+        const previousWidth = this.preferredWidth;
         this._dash.destroy_all_children();
         const inset = DashLayout.contentInset(this._scaleFactor);
         this._layout = DashLayout.layoutDash(this._entries, this._availableWidth, inset, this._scaleFactor);
@@ -76,6 +72,8 @@ export class DashSection extends BaseSection {
             this._dash.add_child(this._createToken(token, height));
         this._dragDrop.addDropZone(this._dash);
         this._dash.queue_relayout();
+        if (this.preferredWidth !== previousWidth)
+            this.emit('layout-changed');
     }
 
     _createToken(token, height) {

@@ -25,7 +25,10 @@ One shared source SHALL expose favorites, running apps, eligible open windows,
 and windows by monitor through explicit queries returning native Shell objects.
 The source SHALL derive complete monitor-specific rendering entries through
 `getEntries({monitor, favoriteOrder, runningOrder})`. Monitor views SHALL own actors
-and local order; entry derivation SHALL NOT modify shared state.
+and local order; entry derivation SHALL NOT modify shared state. The source SHALL
+be a GObject emitting `changed` after state refresh. Each dash section SHALL own
+its `connectObject` connection, disconnected on section destruction, without a
+MonitorManager update relay or custom subscription registry.
 
 #### Scenario: Running window changes
 

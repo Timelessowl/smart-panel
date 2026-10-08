@@ -46,7 +46,13 @@ async function fixture(scale = 1) {
         add_style_class_name() {}
         remove_style_class_name() {}
         set_policy() {}
-        queue_relayout() {}
+        queue_relayout() {
+            let parent = this;
+            while (parent && !parent._dash)
+                parent = parent.get_parent();
+            if (parent)
+                allocate(parent);
+        }
         destroy_all_children() { this.get_children().forEach(child => child.destroy()); }
         destroy() {
             if (this.destroyed) return;
@@ -86,7 +92,7 @@ async function fixture(scale = 1) {
                 idles.set(id, callback);
                 return id;
             }, source_remove: id => { idles.delete(id); timeouts.delete(id); }}},
-        'gi://GObject': {default: {registerClass: cls => cls}},
+        'gi://GObject': {default: GjsHarness.createGObjectDouble()},
         'gi://Shell': {default: {util_set_hidden_from_pick: (actor, hidden) => {
             actor.hiddenFromPick = hidden;
         }}},
@@ -124,10 +130,10 @@ async function fixture(scale = 1) {
         get_app_info: () => ({list_actions: () => []}),
         create_icon_texture: iconSize => new Actor({iconSize, width: iconSize * scale,
             height: iconSize * scale})});
-    const source = {
+    const source = Object.assign(new SignalObject(), {
         favorites: ['firefox', 'files', 'editor', 'music'].map(app),
         running: ['terminal', 'settings', 'calendar'].map(app),
-        panels: [], changes: [], launches: [], desktopActions: [], perWindow: false, monitorOnly: false,
+        changes: [], launches: [], desktopActions: [], perWindow: false, monitorOnly: false,
         getFavorites() { return [...this.favorites]; },
         getRunningApps() { return [...this.running]; },
         getOpenedWindows() { return this.windows; },
@@ -146,9 +152,9 @@ async function fixture(scale = 1) {
         setFavorite(app, favorite) {
             this.changes.push([app.get_id(), favorite]);
             this.favorites.push(app);
-            this.panels.forEach(panel => { panel.refresh(); allocate(panel); });
+            this.emit('changed');
         },
-    };
+    });
     Object.setPrototypeOf(source, DashSource.prototype);
     const makeWindow = (app, id, monitor = 0) => ({app, monitor, minimized: 0, deleted: [],
         get_stable_sequence: () => id, get_title: () => app.get_name(),
@@ -174,8 +180,6 @@ async function fixture(scale = 1) {
         const section = new DashSection(source, index, theme, transient, scale);
         section.setAvailableSize(width, 600 * scale);
         section.set_position(80, 500);
-        source.panels.push(section);
-        section.onOrderChanged = () => { section.refresh(); allocate(section); };
         allocate(section);
         return section;
     }
@@ -302,7 +306,7 @@ describe('Dash drag and drop', () => {
         const removed = f.source.running.find(app => app.get_id() === 'settings');
         f.source.running = f.source.running.filter(app => app !== removed);
         f.source.windows = f.source.windows.filter(win => win.app !== removed);
-        p.refresh(); other.refresh();
+        f.source.emit('changed');
         expect(f.view(p, 'calendar')).toBe(dragged);
         expect(dragged.destroyed).toBeUndefined();
         expect(f.view(p, 'settings')).toBeDefined();
@@ -336,6 +340,29 @@ describe('Dash drag and drop', () => {
         expect(f.source.changes).toEqual([['terminal', true]]);
         expect(Array.from(p._dragDrop._entries.favorites, entry => entry.item.appId)).toEqual(['firefox', 'files', 'terminal', 'editor', 'music']);
         expect(Array.from(other._dragDrop._entries.favorites, entry => entry.item.appId)).toEqual(['firefox', 'files', 'editor', 'music', 'terminal']);
+    });
+
+    it('each dash owns its source connection and destruction leaves other monitors updating', async () => {
+        const f = await fixture();
+        const first = f.panel(0);
+        const second = f.panel(1);
+        expect(f.source.signals.size).toBe(2);
+        first.destroy();
+        expect(f.source.signals.size).toBe(1);
+        const removed = f.source.running.find(app => app.get_id() === 'settings');
+        f.source.running = f.source.running.filter(app => app !== removed);
+        f.source.windows = f.source.windows.filter(window => window.app !== removed);
+        f.source.emit('changed');
+        expect(f.view(second, 'settings')).toBeUndefined();
+        expect(f.view(second, 'terminal')).toBeDefined();
+        const rebuilt = f.panel(0);
+        expect(f.source.signals.size).toBe(2);
+        expect(f.view(rebuilt, 'settings')).toBeUndefined();
+        second.destroy(); rebuilt.destroy();
+        expect(f.source.signals.size).toBe(0);
+        expect(f.source._objectConnections.size).toBe(0);
+        expect(f.monitors.size).toBe(0);
+        expect(f.idles.size).toBe(0);
     });
 
     it('running and non-fixed favorite reordering is panel-local; fixed launchers stay fixed', async () => {

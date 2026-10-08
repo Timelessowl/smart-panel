@@ -4,6 +4,7 @@ let DashSource;
 let DashUtils;
 beforeAll(async () => {
     const imports = {'gi://GLib': {default: {}}, 'gi://Shell': {default: {}},
+        'gi://GObject': {default: GjsHarness.createGObjectDouble()},
         'resource:///org/gnome/shell/ui/appFavorites.js': {},
         'resource:///org/gnome/shell/ui/main.js': {}};
     ({DashSource} = await GjsHarness.loadGjsModule(

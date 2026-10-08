@@ -37,7 +37,7 @@ and `DashLaunches` for shared pending launches. No replacement model classes are
 
 ### One source, monitor-specific entries
 
-The extension owns one `DashSource`, which observes Shell AppSystem,
+The extension owns one `DashSource` GObject with a `changed` signal, which observes Shell AppSystem,
 WindowTracker, AppFavorites, window events, and the two settings. It reuses
 native app/window references and coalesces refreshes. It exposes
 `getFavorites()`, `getRunningApps()`, `getOpenedWindows()`,
@@ -46,7 +46,12 @@ native app/window references and coalesces refreshes. It exposes
 Returned collections are copies. Each `DashSection` requests complete entries;
 it does not reconstruct app/window maps or fixed-favorite sets. App-wide metadata
 is shared; entries, views, local order, expansion and activation cycles are monitor-specific.
-MonitorManager subscriptions trigger per-panel refreshes and geometry updates.
+Each `DashSection` owns a `connectObject('changed', ..., this)` connection to the
+source. Native actor destruction disconnects that listener; there is no custom
+subscription registry or MonitorManager update relay. The section emits
+`layout-changed` only when its preferred width changes, and `BottomPanel` owns a
+`connectObject` connection to that signal for bounds updates. DND requests a
+refresh directly from its owning section instead of passing change callbacks.
 
 The source checks Firefox IDs in order: `firefox.desktop`, `firefox-esr.desktop`,
 `org.mozilla.firefox.desktop`. Files uses `org.gnome.Nautilus.desktop`. These
@@ -150,7 +155,7 @@ when filling the popup directly.
 `DashDragDrop` owns one controller per section: native draggable setup, drag
 monitoring, drop validation, insertion previews, temporary local orders and
 post-release refresh. `DashSection` supplies source entries and `ExpandedDash` supplies surface updates; the section
-receives one change callback. It contains no Shell DND plumbing or drag timers.
+owns its source connection and rendering. It contains no Shell DND plumbing or drag timers.
 
 Native DND uses the icon's `_delegate`. Icon delegates accept before/after drops;
 dash/grid and outer section delegates cover padding or background picks by
