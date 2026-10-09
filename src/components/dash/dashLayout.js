@@ -13,7 +13,7 @@ export function contentInset(scale = 1) {
 }
 
 function tokensFor(entries, count, iconSize, hiddenCount = 0) {
-    const tokens = [{type: 'launchpad', width: Constants.DASH_ICON_SIZE + Constants.DASH_ITEM_INSET}];
+    const tokens = [{type: 'launchpad', width: iconSize + Constants.DASH_ITEM_INSET}];
     let hasSeparator = false;
     for (const entry of entries.slice(0, count)) {
         if (entry.group === 'running' && !hasSeparator) {

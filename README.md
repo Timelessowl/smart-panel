@@ -112,7 +112,7 @@ which disconnects when that section is destroyed. `BottomPanel` similarly listen
 to the section's `layout-changed` signal to update its allocated width.
 `MonitorManager` only creates and destroys monitor panels; it does not relay dash updates.
 
-Launchpad toggles overview and always uses a 40px icon. Favorites follow GNOME's
+Launchpad toggles overview and follows the dash’s 40/32 px icon size. Favorites follow GNOME's
 list, with Firefox and Files fixed first. They cannot be removed or dragged.
 Running items start with a separator; the empty running subsection is hidden.
 App icons start at 40px, shrink to 32px when space runs out, then use a `+N`
@@ -133,8 +133,14 @@ Preferences provide two toggles, both off by default:
   windows are left in place. New-window menu actions use the same monitor scope.
 
 Repeated clicks on a multi-window app focus its windows in opening order, then
-minimize all its represented windows, then start the cycle again. App icons derive
-from GNOME's `PanelMenu.Button` and use its standard popup menu, with desktop-file
+minimize all its represented windows, then start the cycle again. Each `DashIcon` is a bin with a centered vertical layout containing a square
+40/32 px icon button and a separate dot row. The empty dot row reserves the same
+space, keeping icons aligned. Launchpad and +N use the same `DashItem` layout
+and follow the current 40/32 px size. Launchpad fills its canvas with nine colored
+rounded tiles; +N uses a larger label and a transparent idle background. Dots are
+5 px with 4 px spacing and a 2 px gap below the icon. Hover corners are rounded.
+The button derives from GNOME's `PanelMenu.Button`
+and uses its standard popup menu, with desktop-file
 actions and favorite/unfavorite controls. A shared native menu manager handles
 menu switching and grabs. Left-click still activates apps; right-click opens the
 menu. `DashDragDrop` owns draggable setup, drop delegates, previews, local order,

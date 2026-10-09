@@ -19,7 +19,7 @@ async function fixture({desktopActions = [], canOpen = true, pinnable = true,
         }
     }
     const native = PanelMenuDoubles.createDoubles(Actor);
-    const Clutter = {ActorAlign: {FILL: 0}, ClickAction: native.ClickAction,
+    const Clutter = {BinLayout: class {}, ActorAlign: {FILL: 0, CENTER: 1}, ClickAction: native.ClickAction,
         EventType: {BUTTON_PRESS: 1, KEY_PRESS: 2, TOUCH_BEGIN: 3},
         KEY_Menu: 10, KEY_Return: 11, KEY_space: 12, KEY_Up: 13,
         EVENT_STOP: true, EVENT_PROPAGATE: false};
@@ -38,13 +38,13 @@ async function fixture({desktopActions = [], canOpen = true, pinnable = true,
         new URL('components/dash/dashIcon.js', GjsHarness.sourceDirectory), {
             'gi://Clutter': {default: Clutter},
             'gi://GObject': {default: {registerClass: cls => cls}},
-            'gi://St': {default: {Widget: Actor, BoxLayout: Actor, Side: {BOTTOM: 1}}},
+            'gi://St': {default: {Widget: Actor, Bin: Actor, BoxLayout: Actor, Side: {BOTTOM: 1}}},
             'resource:///org/gnome/shell/ui/panelMenu.js': native.PanelMenu,
             'resource:///org/gnome/shell/ui/popupMenu.js': native.PopupMenu,
         },
         {global: {get_current_time: () => 123}});
     const icon = new DashIcon(entry, owner, 40, 48, 62);
-    return {app, entry, owner, calls, icon, native, Clutter, menuStates, actions: icon.menu.items};
+    return {app, entry, owner, calls, icon, native, Clutter, menuStates, actions: icon.button.menu.items};
 }
 
 describe('Dash native panel menus', () => {
@@ -77,40 +77,40 @@ describe('Dash native panel menus', () => {
         }
     });
 
-    it('derives the icon from PanelMenu and uses its ordinary bottom-facing popup', async () => {
+    it('keeps the icon button derived from PanelMenu and uses its ordinary bottom-facing popup', async () => {
         const f = await fixture();
-        expect(f.icon instanceof f.native.PanelMenu.Button).toBe(true);
-        expect(f.icon.menu instanceof f.native.PopupMenu.PopupMenu).toBe(true);
-        expect(f.icon.container.child).toBe(f.icon);
-        expect(f.icon._delegate).toBe(f.icon);
-        expect(f.icon.menu.side).toBe(1);
-        expect(f.native.uiGroup.has(f.icon.menu.actor)).toBe(true);
+        expect(f.icon.button instanceof f.native.PanelMenu.Button).toBe(true);
+        expect(f.icon.button.menu instanceof f.native.PopupMenu.PopupMenu).toBe(true);
+        expect(f.icon.button.container.child).toBe(f.icon.button);
+        expect(f.icon.button._delegate).toBe(f.icon);
+        expect(f.icon.button.menu.side).toBe(1);
+        expect(f.native.uiGroup.has(f.icon.button.menu.actor)).toBe(true);
         const event = button => ({type: () => f.Clutter.EventType.BUTTON_PRESS, get_button: () => button});
-        expect(f.icon.vfunc_event(event(1))).toBe(f.Clutter.EVENT_PROPAGATE);
-        expect(f.icon.menu.isOpen).toBe(false);
-        f.icon._clickAction.emit('clicked');
+        expect(f.icon.button.vfunc_event(event(1))).toBe(f.Clutter.EVENT_PROPAGATE);
+        expect(f.icon.button.menu.isOpen).toBe(false);
+        f.icon.button._clickAction.emit('clicked');
         expect(f.calls).toEqual([['activate', f.entry]]);
-        expect(f.icon.vfunc_event(event(3))).toBe(f.Clutter.EVENT_STOP);
-        expect(f.icon.menu.isOpen).toBe(true);
-        f.icon.vfunc_event(event(3));
-        expect(f.icon.menu.isOpen).toBe(false);
+        expect(f.icon.button.vfunc_event(event(3))).toBe(f.Clutter.EVENT_STOP);
+        expect(f.icon.button.menu.isOpen).toBe(true);
+        f.icon.button.vfunc_event(event(3));
+        expect(f.icon.button.menu.isOpen).toBe(false);
     });
 
     it('keeps keyboard app activation separate from the Menu key and suppresses drag clicks', async () => {
         const f = await fixture();
         const key = value => ({type: () => f.Clutter.EventType.KEY_PRESS, get_key_symbol: () => value});
         for (const value of [f.Clutter.KEY_Return, f.Clutter.KEY_space]) {
-            expect(f.icon.vfunc_event(key(value))).toBe(f.Clutter.EVENT_STOP);
-            expect(f.icon.menu.isOpen).toBe(false);
+            expect(f.icon.button.vfunc_event(key(value))).toBe(f.Clutter.EVENT_STOP);
+            expect(f.icon.button.menu.isOpen).toBe(false);
         }
         expect(f.calls.length).toBe(2);
         f.icon.setDragging(true);
-        f.icon._clickAction.emit('clicked');
-        f.icon.vfunc_event(key(f.Clutter.KEY_Return));
+        f.icon.button._clickAction.emit('clicked');
+        f.icon.button.vfunc_event(key(f.Clutter.KEY_Return));
         expect(f.calls.length).toBe(2);
         f.icon.setDragging(false);
-        f.icon.vfunc_event(key(f.Clutter.KEY_Menu));
-        expect(f.icon.menu.isOpen).toBe(true);
+        f.icon.button.vfunc_event(key(f.Clutter.KEY_Menu));
+        expect(f.icon.button.menu.isOpen).toBe(true);
     });
 
     it('uses native hide/destroy cleanup and a shared manager closes the previous menu', async () => {
@@ -118,32 +118,32 @@ describe('Dash native panel menus', () => {
         const other = new f.native.PopupMenu.PopupMenu(f.icon, 0.5, 1);
         other.addAction('Other', () => {});
         const manager = new f.native.PopupMenu.PopupMenuManager();
-        manager.addMenu(f.icon.menu); manager.addMenu(other);
-        f.icon.menu.open(); other.open();
-        expect(f.icon.menu.isOpen).toBe(false);
-        f.icon.menu.open();
+        manager.addMenu(f.icon.button.menu); manager.addMenu(other);
+        f.icon.button.menu.open(); other.open();
+        expect(f.icon.button.menu.isOpen).toBe(false);
+        f.icon.button.menu.open();
         expect(other.isOpen).toBe(false);
-        f.icon.vfunc_hide();
-        expect(f.icon.menu.isOpen).toBe(false);
-        f.icon.menu.open();
+        f.icon.button.vfunc_hide();
+        expect(f.icon.button.menu.isOpen).toBe(false);
+        f.icon.button.menu.open();
         f.icon.destroy();
-        expect(f.icon.menu.destroyed).toBe(true);
+        expect(f.icon.button.menu.destroyed).toBe(true);
         expect(f.native.uiGroup.size).toBe(0);
-        expect(manager.menus.has(f.icon.menu)).toBe(false);
-        expect(f.icon.container.destroyed).toBe(true);
+        expect(manager.menus.has(f.icon.button.menu)).toBe(false);
+        expect(f.icon.button.container.destroyed).toBe(true);
         expect(f.menuStates).toEqual([true, false, true, false, true, false]);
     });
 
     it('rebuilds favorite controls from current state when the native menu is opened', async () => {
         const f = await fixture();
         f.owner.isFavorite = () => true;
-        f.icon._toggleMenu();
-        expect(f.icon.menu.items.at(-1).label.text).toBe('Remove from Favorites');
-        f.icon.menu.items.at(-1).activate();
+        f.icon.button._toggleMenu();
+        expect(f.icon.button.menu.items.at(-1).label.text).toBe('Remove from Favorites');
+        f.icon.button.menu.items.at(-1).activate();
         expect(f.calls).toEqual([['favorite', f.app, false]]);
         f.owner.canSetFavorite = () => false;
-        f.icon._toggleMenu();
-        expect(f.icon.menu.items.map(item => item.label.text)).toEqual(['New Window']);
+        f.icon.button._toggleMenu();
+        expect(f.icon.button.menu.items.map(item => item.label.text)).toEqual(['New Window']);
     });
 
 });

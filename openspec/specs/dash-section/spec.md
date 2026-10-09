@@ -60,15 +60,15 @@ across Shell restarts and SHALL update existing panel views when changed.
 
 ### Requirement: Launchpad subsection
 
-The first subsection SHALL contain only Launchpad, whose icon SHALL remain 40
-logical pixels even when app icons shrink. Clicking it SHALL toggle overview.
+The first subsection SHALL contain only Launchpad, whose icon SHALL follow the
+dash’s selected 40/32 logical pixel size. Clicking it SHALL toggle overview.
 It SHALL NOT receive window indicators, app context actions, or item drag behavior.
 There SHALL be no separator between Launchpad and favorites.
 
 #### Scenario: Apps shrink to the small size
 
 - **WHEN** the dash uses 32-pixel app icons to fit available width
-- **THEN** Launchpad remains 40 logical pixels and clicking it still toggles overview.
+- **THEN** Launchpad shrinks to 32 logical pixels alongside the apps and clicking it still toggles overview.
 
 ### Requirement: Favorite identity and fixed entries
 
@@ -142,9 +142,12 @@ workspaces. Favorites themselves SHALL remain on every panel.
 In per-app mode each app icon SHALL show one dot per visible window, capped at
 four, and no dots for zero windows. In per-window mode favorite icons SHALL show
 at most one dot and running-window icons SHALL show none. Dots SHALL be centered
-below the actual icon, with a three-pixel diameter and a three-pixel gap. They
+below the actual icon, with a five-pixel diameter, four-pixel spacing, and a
+two-pixel gap beneath the icon. They
 SHALL NOT alter its position or size request. Dash button hover highlights SHALL
-be square, centered on their content, with sharp corners.
+be square, centered on their content, with six-pixel rounded corners. Launchpad
+SHALL use a full-size colored nine-tile grid. The +N control SHALL use a larger
+label proportional to icon size, with a transparent background until hovered.
 
 #### Scenario: Window count changes
 

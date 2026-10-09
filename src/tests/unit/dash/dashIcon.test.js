@@ -9,13 +9,7 @@ async function fixture(scale) {
     const dotSize = Number(dotStyle.match(/height:\s*(\d+)px/)[1]) * scale;
     const dotsStyle = Stylesheet.stylesheet.match(/\.dash-window-dots\s*\{([^}]+)\}/)[1];
     const dotGap = Number(dotsStyle.match(/padding-top:\s*(\d+)px/)[1]) * scale;
-    class ActorBox {
-        constructor(x1 = 0, y1 = 0, x2 = 0, y2 = 0) {
-            Object.assign(this, {x1, y1, x2, y2});
-        }
-        get_width() { return this.x2 - this.x1; }
-        get_height() { return this.y2 - this.y1; }
-    }
+    const dotSpacing = Number(dotsStyle.match(/spacing:\s*(\d+)px/)[1]) * scale;
     class Actor extends SignalObject {
         constructor(props = {}) {
             super();
@@ -26,8 +20,8 @@ async function fixture(scale) {
                 this.naturalHeight = dotSize;
             }
         }
-        add_child(child) { this.children.push(child); }
-        set_child(child) { this.child = child; this.children = child ? [child] : []; }
+        add_child(child) { child.parent = this; this.children.push(child); }
+        set_child(child) { this.child = child; this.children = []; if (child) this.add_child(child); }
         set_size(width, height) { Object.assign(this, {width, height}); }
         add_action(action) { this.action = action; }
         add_style_class_name() {}
@@ -45,16 +39,16 @@ async function fixture(scale) {
     class BoxLayout extends Actor {
         get_preferred_width() {
             const width = this.children.length * dotSize +
-                Math.max(0, this.children.length - 1) * 2 * scale;
+                Math.max(0, this.children.length - 1) * dotSpacing;
             return [width, width];
         }
         get_preferred_height() { return [dotSize + dotGap, dotSize + dotGap]; }
     }
     const nativeMenus = PanelMenuDoubles.createDoubles(Actor);
     const imports = {
-        'gi://Clutter': {default: {ActorBox, ActorAlign: {FILL: 0}, ClickAction: nativeMenus.ClickAction}},
+        'gi://Clutter': {default: {BinLayout: class {}, ActorAlign: {FILL: 0, CENTER: 1}, ClickAction: nativeMenus.ClickAction}},
         'gi://GObject': {default: {registerClass: cls => cls}},
-        'gi://St': {default: {Widget: Actor, Button: Actor, BoxLayout, Side: {BOTTOM: 1}}},
+        'gi://St': {default: {Widget: Actor, Bin: Actor, Button: Actor, BoxLayout, Side: {BOTTOM: 1}}},
         'resource:///org/gnome/shell/ui/dnd.js': {},
         'resource:///org/gnome/shell/ui/main.js': {},
         'resource:///org/gnome/shell/ui/popupMenu.js': nativeMenus.PopupMenu,
@@ -67,15 +61,14 @@ async function fixture(scale) {
             naturalWidth: iconSize * scale, naturalHeight: iconSize * scale,
         })}};
         const button = new DashIcon({item, indicatorCount, group: 'favorites', hardcoded: true},
-            {canSetFavorite: () => false}, iconSize, (iconSize + 8) * scale, rowHeight * scale);
-        const content = button.children[0];
-        content.vfunc_allocate(new ActorBox(100, 200, 100 + button.width, 200 + button.height));
-        return {content, icon: content._icon, dots: content._dots, highlight: content._highlight};
+            {canSetFavorite: () => false}, iconSize, (iconSize + 8) * scale, rowHeight * scale, scale);
+        return {view: button, button: button.button, texture: button.getDragActorSource(),
+            dots: button.indicators, content: button.child};
     }};
 }
 
-describe('Dash icon allocation', () => {
-    it('dots stay centered below the icon at both sizes, in collapsed and expanded rows, at native scale', async () => {
+describe('Dash icon actors', () => {
+    it('uses an icon-sized native button and a separate indicator row at both sizes and native scales', async () => {
         for (const scale of [1, 1.5, 2]) {
             const f = await fixture(scale);
             for (const iconSize of [32, 40]) {
@@ -83,20 +76,34 @@ describe('Dash icon allocation', () => {
                     Constants.DASH_EXPANDED_ROW_HEIGHT]) {
                     const plain = f.create(iconSize, 0, rowHeight);
                     for (const count of [1, 2, 3, 4]) {
-                        const {content, icon, dots, highlight} = f.create(iconSize, count, rowHeight);
-                        expect(highlight.allocation.get_width()).toBe(highlight.allocation.get_height());
-                        expect(icon.allocation).toEqual(plain.icon.allocation);
-                        expect(content.vfunc_get_preferred_width(-1)).toEqual(plain.content.vfunc_get_preferred_width(-1));
-                        expect(content.vfunc_get_preferred_height(-1)).toEqual(plain.content.vfunc_get_preferred_height(-1));
-                        expect(content.x_expand).toBe(true);
-                        expect(content.y_expand).toBe(true);
-                        expect(dots.allocation.y1).toBe(icon.allocation.y2);
-                        expect(Math.abs((dots.allocation.x1 + dots.allocation.x2) / 2 -
-                            (icon.allocation.x1 + icon.allocation.x2) / 2)).toBeLessThanOrEqual(0.5);
-                        expect(dots.allocation.y2).toBeLessThanOrEqual(rowHeight * scale);
+                        const {view, button, texture, dots, content} = f.create(iconSize, count, rowHeight);
+                        expect(content.vertical).toBeTrue();
+                        expect(content.children).toEqual([button.container, dots]);
+                        expect(button.children).toEqual([texture]);
+                        expect(dots.parent).toBe(content);
+                        expect(dots.children.length).toBe(count);
+                        expect(button.width).toBe(iconSize * scale);
+                        expect(button.height).toBe(iconSize * scale);
+                        expect(texture.get_preferred_width(-1)[1]).toBe(button.width);
+                        expect(texture.get_preferred_height(-1)[1]).toBe(button.height);
+                        expect(view.width).toBe(plain.view.width);
+                        expect(view.height).toBe(plain.view.height);
+                        expect(dots.get_preferred_height(-1)).toEqual(plain.dots.get_preferred_height(-1));
+                        expect(dots.get_preferred_width(-1)[1]).toBeLessThanOrEqual(button.width);
+                        expect(button.height + dots.get_preferred_height(-1)[1]).toBeLessThanOrEqual(view.height);
+                        expect(dots.x_align).toBe(content.x_align);
                     }
                 }
             }
         }
+    });
+
+    it('uses the reference proportions and keeps +N transparent until hovered', () => {
+        expect(Stylesheet.stylesheet).toMatch(/\.dash-window-dots\s*\{[^}]*min-height:\s*5px/);
+        expect(Stylesheet.stylesheet).toMatch(/\.dash-window-dot\s*\{[^}]*height:\s*5px/);
+        expect(Stylesheet.stylesheet).toMatch(/\.dash-app-button:focus\s*\{[^}]*border-radius:\s*6px/);
+        expect(Stylesheet.stylesheet).not.toMatch(/\.dash-overflow-button\s*\{/);
+        expect(Stylesheet.stylesheet).toContain('.dash-app-button:hover');
+        expect(Stylesheet.stylesheet).not.toContain('dash-hover-highlight');
     });
 });

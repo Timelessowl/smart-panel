@@ -113,12 +113,12 @@ describe('Dash entries, layout and actions', () => {
         const small = DashLayout.layoutDash(items, wide.width - 1, 11);
         expect(small.iconSize).toBe(32);
         expect(small.hiddenCount).toBe(0);
-        expect(small.width).toBe(214);
+        expect(small.width).toBe(206);
         const overflow = DashLayout.layoutDash(items, small.width - 1, 11);
         expect(overflow.iconSize).toBe(32);
         expect(overflow.hiddenCount).toBeGreaterThan(0);
         expect(overflow.width).toBeLessThanOrEqual(small.width - 1);
-        expect(overflow.tokens[0].width).toBe(48);
+        expect(overflow.tokens[0].width).toBe(40);
         expect(overflow.tokens.at(-1).hiddenCount).toBe(overflow.hiddenCount);
     });
 

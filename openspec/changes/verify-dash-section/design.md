@@ -75,8 +75,8 @@ favorites, and zero for window-mode running items.
 BottomPanel supplies the dash's available stage width and maximum expansion
 height; DashSection reports preferred width without sizing its panel.
 `layoutDash()` produces Launchpad, icon, separator, and overflow tokens. It tries
-40-pixel apps, then 32-pixel apps, then a visible prefix plus +N. Launchpad remains
-40 pixels. Width includes rounded item sizes, spacing, content inset, and border.
+40-pixel buttons, then 32-pixel buttons, then a visible prefix plus +N. Launchpad
+and +N follow the selected icon size. Width includes rounded item sizes, spacing, content inset, and border.
 `CONTENT_INSET` counts the frame's solid outline and native padding, any dash
 padding extending beyond that band, and the content's thin border, once each.
 The opaque dash child's CSS padding does not duplicate its parent's frame.
@@ -90,17 +90,23 @@ provides the same token factory used by the collapsed view. DND requests dismiss
 suspension through `setDragging()`, without owning the transient registration. On exceptionally narrow allocations
 the section clips rather than invading search; no extra behavior is invented.
 
-### Dots are an allocation overlay
+### Icon buttons and indicators are separate actors
 
-`DashButtonContent` requests only the foreground size and centers its actual native
-dimensions. A square, sharp-cornered highlight sits behind that foreground; it
-does not stretch to the full row height. The same content wrapper is used by
-app, Launchpad and overflow buttons. Dots are allocated below the app texture.
-Adding dots does not alter preferred size or move the texture. This supports
-native icon scaling rather than assuming raw icon_size equals stage pixels.
-The dot diameter is three logical pixels with two-pixel spacing and three pixels
-of padding above the dots. Expanded rows have enough vertical inset for the
-larger indicators without clipping.
+`DashIcon` derives from the shared `DashItem` bin containing a centered vertical
+`St.BoxLayout`. Launchpad and +N use that same bin, including the reserved empty
+indicator row, and follow the dash’s current 40/32 px icon size. The
+column contains the native PanelMenu button's container and a separate indicator
+row. The button is exactly 40 or 32 logical pixels square, with the app texture
+as its only child. Native Bin/Box layouts allocate these actors; there is no
+custom content allocation or hover overlay. Hover styles apply to the button with six-pixel rounded corners. Launchpad
+uses a native homogeneous 3×3 grid of colored rounded tiles filling the icon
+canvas. +N has a label sized to 65% of icon height (reduced for long counts)
+and a transparent background until hovered.
+The five-pixel dots have four-pixel spacing and two pixels of padding above.
+An empty indicator row reserves the same height so button alignment does not
+change with running state. Only the button handles activation, menus and drag
+initiation; the dots and surrounding bin are non-reactive. Expanded and collapsed
+rows use the same actors and scale their button size to native stage coordinates.
 
 ### Expansion is a non-modal top-chrome surface
 
@@ -136,7 +142,7 @@ window opened by the same app while its launch request is pending.
 
 ### Icons use native panel menus
 
-`DashIcon` extends GNOME's `PanelMenu.Button`, uses its standard container and
+The icon button inside `DashIcon` extends GNOME's `PanelMenu.Button`, uses its standard container and
 `setMenu()` lifecycle, and fills a normal `PopupMenu` with `addAction()`. There is
 no separate menu-descriptor module or custom popup class. A shared native
 `PopupMenuManager` handles grabs, menu switching, Escape and outside clicks.
@@ -160,11 +166,12 @@ monitoring, drop validation, insertion previews, temporary local orders and
 post-release refresh. `DashSection` supplies source entries and `ExpandedDash` supplies surface updates; the section
 owns its source connection and rendering. It contains no Shell DND plumbing or drag timers.
 
-Native DND uses the icon's `_delegate`. Icon delegates accept before/after drops;
-dash/grid and outer section delegates cover padding or background picks by
-finding the nearest DashIcon in row coordinates after transforming native
-container/actor positions. PanelMenu buttons keep their standard containers. Shared frames and
-insertion previews are hidden from pick. An opaque decorative actor must not
+DND starts on the inner button with its `_delegate` pointing to the containing
+`DashIcon`. Dash/grid and outer section delegates resolve before/after drop
+targets for buttons, indicators and padding alike, finding the nearest DashIcon
+in row coordinates after transforming native container/actor positions.
+PanelMenu buttons keep their standard containers. Shared frames and insertion
+previews are hidden from pick. An opaque decorative actor must not
 terminate target traversal before a delegate can be reached.
 
 Orders are per-section app IDs for favorites and app/stable-window IDs for running. Fixed

@@ -69,7 +69,8 @@ export class DashDragDrop {
         this._icons.add(icon);
         icon.dragDrop = this;
         if (!(icon.entry.hardcoded && icon.entry.group === 'favorites')) {
-            icon.enableDragging(DND.makeDraggable(icon, {restoreOnSuccess: false}));
+            icon.draggable = DND.makeDraggable(icon.button, {restoreOnSuccess: false});
+            icon.button.attachClickAction(icon.draggable);
             icon.draggable.connect('drag-begin', () => this._dragStarted(icon));
             icon.draggable.connect('drag-cancelled', () => this._log('cancelled', icon));
             icon.draggable.connect('drag-end', (_draggable, _time, success) => {

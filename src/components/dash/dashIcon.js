@@ -4,101 +4,109 @@ import St from 'gi://St';
 import {Button as PanelMenuButton} from '@girs/gnome-shell/ui/panelMenu';
 import * as PopupMenu from '@girs/gnome-shell/ui/popupMenu';
 
-// Indicators are an overlay, not part of the icon's size request. Allocate them
-// relative to the actual icon texture, regardless of the button's row height.
-export class DashButtonContent extends St.Widget {
+// Fill the icon canvas with the reference's nine colored, rounded tiles.
+export class DashLaunchpadIcon extends St.Widget {
     static {
         GObject.registerClass(this);
     }
 
-    constructor(icon, dots = null) {
-        super({x_expand: true, y_expand: true,
-            x_align: Clutter.ActorAlign.FILL, y_align: Clutter.ActorAlign.FILL});
-        this._icon = icon;
-        this._dots = dots;
-        this._highlight = new St.Widget({style_class: 'dash-hover-highlight'});
-        this.add_child(this._highlight);
-        this.add_child(icon);
-        if (dots)
-            this.add_child(dots);
-    }
-
-    vfunc_get_preferred_width(forHeight) {
-        return this._icon.get_preferred_width(forHeight);
-    }
-
-    vfunc_get_preferred_height(forWidth) {
-        return this._icon.get_preferred_height(forWidth);
-    }
-
-    vfunc_allocate(box) {
-        this.set_allocation(box);
-        const width = box.get_width();
-        const height = box.get_height();
-        const side = Math.min(width, height);
-        const highlightBox = new Clutter.ActorBox();
-        highlightBox.x1 = Math.floor((width - side) / 2);
-        highlightBox.y1 = Math.floor((height - side) / 2);
-        highlightBox.x2 = highlightBox.x1 + side;
-        highlightBox.y2 = highlightBox.y1 + side;
-        this._highlight.allocate(highlightBox);
-        const [, iconWidth] = this._icon.get_preferred_width(-1);
-        const [, iconHeight] = this._icon.get_preferred_height(iconWidth);
-        const iconBox = new Clutter.ActorBox();
-        iconBox.x1 = Math.floor((width - iconWidth) / 2);
-        iconBox.y1 = Math.floor((height - iconHeight) / 2);
-        iconBox.x2 = iconBox.x1 + iconWidth;
-        iconBox.y2 = iconBox.y1 + iconHeight;
-        this._icon.allocate(iconBox);
-
-        if (this._dots) {
-            const [, dotsWidth] = this._dots.get_preferred_width(-1);
-            const [, dotsHeight] = this._dots.get_preferred_height(dotsWidth);
-            const dotsBox = new Clutter.ActorBox();
-            dotsBox.x1 = Math.round((iconBox.x1 + iconBox.x2 - dotsWidth) / 2);
-            dotsBox.x2 = dotsBox.x1 + dotsWidth;
-            dotsBox.y1 = iconBox.y2;
-            dotsBox.y2 = dotsBox.y1 + dotsHeight;
-            this._dots.allocate(dotsBox);
+    constructor(iconSize, scaleFactor = 1) {
+        const side = Math.round(iconSize * scaleFactor);
+        const spacing = Math.round(2 * scaleFactor);
+        const grid = new Clutter.GridLayout({column_homogeneous: true, row_homogeneous: true,
+            column_spacing: spacing, row_spacing: spacing});
+        super({layout_manager: grid, width: side, height: side});
+        for (let index = 0; index < 9; index++) {
+            const tile = new St.Widget({style_class: `dash-launchpad-tile dash-launchpad-tile-${index}`,
+                x_expand: true, y_expand: true,
+                x_align: Clutter.ActorAlign.FILL, y_align: Clutter.ActorAlign.FILL});
+            grid.attach(tile, index % 3, Math.floor(index / 3), 1, 1);
         }
     }
 }
 
-export class DashIcon extends PanelMenuButton {
+// All dash buttons reserve the same indicator row, including Launchpad and +N.
+export class DashItem extends St.Bin {
+    static {
+        GObject.registerClass(this);
+    }
+
+    constructor(width, height) {
+        super({width, height});
+        this.indicators = new St.BoxLayout({style_class: 'dash-window-dots',
+            x_align: Clutter.ActorAlign.CENTER});
+    }
+
+    setButton(actor) {
+        const content = new St.BoxLayout({vertical: true,
+            x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER});
+        content.add_child(actor);
+        content.add_child(this.indicators);
+        this.set_child(content);
+    }
+}
+
+// The icon button handles input and menus; its indicators remain separate.
+export class DashIcon extends DashItem {
     /** @type {ReturnType<typeof import('@girs/gnome-shell/ui/dnd').makeDraggable>} */
     draggable;
     static {
         GObject.registerClass(this);
     }
 
-    constructor(entry, owner, iconSize, width, height) {
-        // PanelMenu owns the menu actor, accessibility, hide and destroy paths.
-        // Use its standard container when inserting this button into a dash row.
-        super(0.5, entry.item.name, true);
-        this.add_style_class_name('dash-app-button');
-        this.set_size(width, height);
-        this.container.set_size(width, height);
+    constructor(entry, owner, iconSize, width, height, scaleFactor = 1) {
+        super(width, height);
         this.entry = entry;
         this.item = entry.item;
         this.iconSize = iconSize;
-        this._owner = owner;
-        this._dragging = false;
         this.dragDrop = null;
+        this.dragging = false;
+        this.button = new DashIconButton(this, owner, Math.round(iconSize * scaleFactor));
+        for (let index = 0; index < entry.indicatorCount; index++)
+            this.indicators.add_child(new St.Widget({style_class: 'dash-window-dot'}));
+        this.setButton(this.button.container);
+    }
+
+    setDragging(dragging) {
+        this.dragging = dragging;
+        if (dragging) {
+            this.button.menu.close();
+            this.button.cancelClick();
+        }
+    }
+
+    getDragActor() {
+        return this.item.app.create_icon_texture(this.iconSize);
+    }
+
+    getDragActorSource() {
+        return this.button.icon;
+    }
+}
+
+class DashIconButton extends PanelMenuButton {
+    static {
+        GObject.registerClass(this);
+    }
+
+    constructor(dashIcon, owner, side) {
+        super(0.5, dashIcon.item.name, true);
+        this._dashIcon = dashIcon;
+        this._owner = owner;
+        this.add_style_class_name('dash-app-button');
+        this.layout_manager = new Clutter.BinLayout();
+        this.set_size(side, side);
+        this.container.set_size(side, side);
+        this.container.x_align = Clutter.ActorAlign.CENTER;
+        this.container.y_align = Clutter.ActorAlign.CENTER;
+        this.icon = dashIcon.item.app.create_icon_texture(dashIcon.iconSize);
+        this.add_child(this.icon);
         const menu = new PopupMenu.PopupMenu(this, 0.5, St.Side.BOTTOM);
         this.setMenu(menu);
-        // PopupDummyMenu replaces the source delegate; DND needs the icon itself.
-        this._delegate = this;
+        // DND starts on the button but uses the containing DashIcon as its source.
+        this._delegate = dashIcon;
         menu.connect('open-state-changed', (_menu, open) =>
             this._owner?.menuChanged(menu.actor, open));
-
-        this._icon = this.item.app.create_icon_texture(iconSize);
-        let dots = null;
-        if (entry.indicatorCount) {
-            dots = new St.BoxLayout({style_class: 'dash-window-dots'});
-            for (let index = 0; index < entry.indicatorCount; index++)
-                dots.add_child(new St.Widget({style_class: 'dash-window-dot'}));
-        }
-        this.add_child(new DashButtonContent(this._icon, dots));
         // Shell 49 uses cooperating gestures; older Shells require DND's
         // addClickAction() bridge so a captured press can become a drag.
         const ClickGesture = /** @type {typeof Clutter & {
@@ -110,24 +118,24 @@ export class DashIcon extends PanelMenuButton {
             gesture.connect('should-handle-sequence', (_gesture, event) => {
                 if (event.type() === Clutter.EventType.TOUCH_BEGIN ||
                     (event.type() === Clutter.EventType.BUTTON_PRESS && event.get_button() === 1))
-                    this.dragDrop?.notePress(this);
+                    this._dashIcon.dragDrop?.notePress(this._dashIcon);
                 return true;
             });
             gesture.connect('recognize', () => {
-                if (!this._dragging)
-                    this._owner.activateEntry(this.entry);
+                if (!this._dashIcon.dragging)
+                    this._owner.activateEntry(this._dashIcon.entry);
             });
             this.add_action(gesture);
         } else {
             this._clickAction = new Clutter.ClickAction();
             this._clickAction.connect('long-press', (_action, _actor, state) => {
                 if (state === Clutter.LongPressState.QUERY)
-                    this.dragDrop?.notePress(this);
+                    this._dashIcon.dragDrop?.notePress(this._dashIcon);
                 return true;
             });
             this._clickAction.connect('clicked', action => {
-                if (!this._dragging && action.get_button() <= 1)
-                    this._owner.activateEntry(this.entry);
+                if (!this._dashIcon.dragging && action.get_button() <= 1)
+                    this._owner.activateEntry(this._dashIcon.entry);
             });
             this.add_action(this._clickAction);
         }
@@ -147,8 +155,8 @@ export class DashIcon extends PanelMenuButton {
                 return Clutter.EVENT_STOP;
             }
             if (key === Clutter.KEY_Return || key === Clutter.KEY_space) {
-                if (!this._dragging)
-                    this._owner.activateEntry(this.entry);
+                if (!this._dashIcon.dragging)
+                    this._owner.activateEntry(this._dashIcon.entry);
                 return Clutter.EVENT_STOP;
             }
             if (key === Clutter.KEY_Up)
@@ -159,10 +167,7 @@ export class DashIcon extends PanelMenuButton {
         return Clutter.EVENT_PROPAGATE;
     }
 
-    get dragging() { return this._dragging; }
-
-    enableDragging(draggable) {
-        this.draggable = draggable;
+    attachClickAction(draggable) {
         if (this._clickAction) {
             const nativeDrag = /** @type {typeof draggable & {
                 addClickAction(action: Clutter.ClickAction): void
@@ -172,50 +177,30 @@ export class DashIcon extends PanelMenuButton {
         }
     }
 
-    setDragging(dragging) {
-        this._dragging = dragging;
-        if (dragging) {
-            this.menu.close();
-            this._clickAction?.release();
-        }
-    }
-
-    getDragActor() {
-        return this.item.app.create_icon_texture(this.iconSize);
-    }
-
-    getDragActorSource() {
-        return this._icon;
-    }
-
-    handleDragOver(source, _actor, x) {
-        return this.dragDrop.dragOver(source, this.entry, x > this.width / 2, this);
-    }
-
-    acceptDrop(source, _actor, x) {
-        return this.dragDrop.drop(source, this.entry, x > this.width / 2);
+    cancelClick() {
+        this._clickAction?.release();
     }
 
     _toggleMenu() {
         this._populateMenu();
-        this._clickAction?.release();
-        this.draggable?.fakeRelease?.();
+        this.cancelClick();
+        this._dashIcon.draggable?.fakeRelease?.();
         this.menu.toggle();
     }
 
     _populateMenu() {
         const menu = /** @type {PopupMenu.PopupMenu} */ (this.menu);
         menu.removeAll();
-        const app = this.item.app;
+        const app = this._dashIcon.item.app;
         const info = app.get_app_info();
         const desktopActions = info?.list_actions() ?? [];
         if (app.can_open_new_window() && !desktopActions.includes('new-window'))
             menu.addAction('New Window', () => this._owner.openNewWindow(app));
         for (const action of desktopActions)
             menu.addAction(info.get_action_name(action), () => this._owner.launchAction(app, action));
-        if (this.entry.representedWindow) {
+        if (this._dashIcon.entry.representedWindow) {
             menu.addAction('Close Window', () =>
-                this.entry.representedWindow.delete(global.get_current_time()));
+                this._dashIcon.entry.representedWindow.delete(global.get_current_time()));
         }
         if (this._owner.canSetFavorite(app)) {
             const favorite = this._owner.isFavorite(app.get_id());
@@ -223,6 +208,6 @@ export class DashIcon extends PanelMenuButton {
                 this._owner.setFavorite(app, !favorite));
         }
         if (!menu.numMenuItems)
-            menu.addAction('Open', () => this._owner.activateEntry(this.entry));
+            menu.addAction('Open', () => this._owner.activateEntry(this._dashIcon.entry));
     }
 }

@@ -5,7 +5,7 @@ import * as Main from '@girs/gnome-shell/ui/main';
 
 import * as Constants from '@/constant.js';
 import {BaseSection} from '@/components/baseSection.js';
-import {DashIcon, DashButtonContent} from '@/components/dash/dashIcon.js';
+import {DashIcon, DashItem, DashLaunchpadIcon} from '@/components/dash/dashIcon.js';
 import * as DashLayout from '@/components/dash/dashLayout.js';
 import {DashDragDrop} from '@/components/dash/dashDragDrop.js';
 import * as PopupMenu from '@girs/gnome-shell/ui/popupMenu';
@@ -79,16 +79,19 @@ export class DashSection extends BaseSection {
     _createToken(token, height) {
         const width = this._scale(token.width);
         if (token.type === 'launchpad') {
+            const side = this._scale(this._layout.iconSize);
             const button = new St.Button({style_class: 'dash-app-button dash-launchpad',
-                accessible_name: 'Toggle overview', can_focus: true, width, height,
-                child: new DashButtonContent(new St.Icon({icon_name: 'view-app-grid-symbolic',
-                    icon_size: Constants.DASH_ICON_SIZE}))});
+                accessible_name: 'Toggle overview', can_focus: true, width: side, height: side,
+                x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER,
+                child: new DashLaunchpadIcon(this._layout.iconSize, this._scaleFactor)});
             button.connect('clicked', () => {
                 this._actions.resetCycle();
                 this.closeExpanded();
                 Main.overview.toggle();
             });
-            return button;
+            const item = new DashItem(width, height);
+            item.setButton(button);
+            return item;
         }
         if (token.type === 'separator') {
             return new St.Bin({
@@ -98,17 +101,23 @@ export class DashSection extends BaseSection {
                     width: this._scale(1), x_align: Clutter.ActorAlign.CENTER, y_expand: true})});
         }
         if (token.type === 'overflow') {
-            const button = new St.Button({width, height,
-                child: new DashButtonContent(new St.Label({text: `+${token.hiddenCount}`})),
+            const side = this._scale(this._layout.iconSize);
+            const text = `+${token.hiddenCount}`;
+            const fontSize = Math.round(this._layout.iconSize * Math.min(0.65, 1.5 / text.length));
+            const button = new St.Button({width: side, height: side,
+                x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER,
+                child: new St.Label({text, style: `font-size: ${fontSize}px;`}),
                 style_class: 'dash-app-button dash-overflow-button', can_focus: true,
                 accessible_name: `Show ${token.hiddenCount} more apps or windows`});
             button.connect('clicked', () => this._openExpanded());
-            return button;
+            const item = new DashItem(width, height);
+            item.setButton(button);
+            return item;
         }
-        const view = new DashIcon(token.entry, this, this._layout.iconSize, width, height);
+        const view = new DashIcon(token.entry, this, this._layout.iconSize, width, height, this._scaleFactor);
         this._dragDrop.attachIcon(view);
-        this._menuManager.addMenu(/** @type {PopupMenu.PopupMenu} */ (view.menu));
-        return view.container;
+        this._menuManager.addMenu(/** @type {PopupMenu.PopupMenu} */ (view.button.menu));
+        return view;
     }
 
     _scale(value) {

@@ -4,11 +4,20 @@ import * as Constants from '@/constant.js';
 import * as PanelMenuDoubles from '@/tests/panelMenu.js';
 
 async function fixture(scale = 1, gestures = false) {
+    class GridLayout {
+        constructor(props) { Object.assign(this, props); }
+        attach(tile, column, row, width, height) {
+            tile.cell = {column, row, width, height};
+            this.container.add_child(tile);
+        }
+    }
     class Actor extends SignalObject {
         constructor(props = {}) {
             super();
             Object.assign(this, {x: 0, y: 0, width: 0, height: 0, visible: true}, props);
             this.children = [];
+            if (props.layout_manager instanceof GridLayout)
+                props.layout_manager.container = this;
             if (props.child)
                 this.set_child(props.child);
         }
@@ -114,7 +123,7 @@ async function fixture(scale = 1, gestures = false) {
         move(coords) {
             if (this.held && Math.hypot(coords[0] - this.coords[0], coords[1] - this.coords[1]) > 8) {
                 this.held = false;
-                this.actor.draggable?.emit('drag-begin', 123);
+                this.actor._delegate.draggable?.emit('drag-begin', 123);
             }
         }
         end() { if (this.held) this.emit('recognize'); this.held = false; }
@@ -122,12 +131,15 @@ async function fixture(scale = 1, gestures = false) {
     const DND = {
         DragMotionResult: {CONTINUE: 0, NO_DROP: 1, MOVE_DROP: 2},
         DragDropResult: {CONTINUE: 0},
-        makeDraggable: actor => new Draggable(actor),
+        makeDraggable: actor => {
+            expect(actor instanceof nativeMenus.PanelMenu.Button).toBeTrue();
+            return new Draggable(actor);
+        },
         addDragMonitor: monitor => monitors.add(monitor),
         removeDragMonitor: monitor => monitors.delete(monitor),
     };
     const imports = {
-        'gi://Clutter': {default: {BinLayout: class {}, FixedLayout: class {},
+        'gi://Clutter': {default: {BinLayout: class {}, FixedLayout: class {}, GridLayout,
             ActorAlign: {FILL: 0, CENTER: 1}, ClickAction: nativeMenus.ClickAction,
             ...(gestures ? {ClickGesture} : {}), LongPressState: {QUERY: 'query'},
             EventType: {BUTTON_PRESS: 1, TOUCH_BEGIN: 3}}},
@@ -246,9 +258,27 @@ async function fixture(scale = 1, gestures = false) {
         }
         return actor;
     }
+    // Model native Bin/vertical Box allocation so picks can reach the button
+    // texture, indicator row and the non-reactive space around the button.
+    function layoutIcon(icon) {
+        const button = icon.button;
+        const dots = icon.indicators;
+        const gap = 7 * scale;
+        const side = button.width;
+        const content = icon.child;
+        content.set_size(side, side + gap);
+        content.set_position((icon.width - side) / 2, (icon.height - side - gap) / 2);
+        button.container.set_position(0, 0);
+        button.set_position(0, 0);
+        const count = dots.get_children().length;
+        const dotsWidth = (count * 5 + Math.max(0, count - 1) * 4) * scale;
+        dots.set_size(dotsWidth, gap);
+        dots.set_position((side - dotsWidth) / 2, side);
+    }
     function at(view, after = false) {
-        const [x, y] = view.get_transformed_position();
-        return [x + view.width * (after ? 0.75 : 0.25), y + view.height / 2];
+        layoutIcon(view);
+        const [x, y] = view.button.get_transformed_position();
+        return [x + view.button.width * (after ? 0.75 : 0.25), y + view.button.height / 2];
     }
     function dispatch(kind, dragged, surface, point) {
         const [x, y] = point;
@@ -279,14 +309,92 @@ async function fixture(scale = 1, gestures = false) {
     }
     const view = (section, appId) => [...section._dragDrop._icons].find(icon => icon.item.appId === appId);
     function pointer(icon, phase, coords = at(icon), button = 1) {
-        icon.action[phase](coords, button);
+        icon.button.action[phase](coords, button);
         for (const redraw of redraws.splice(0)) redraw();
     }
+    function pressAt(surface, coords) {
+        let actor = pick(surface, ...coords);
+        while (actor) {
+            if (actor.reactive && actor.action) {
+                actor.action.press(coords);
+                return actor;
+            }
+            actor = actor.get_parent();
+        }
+        return null;
+    }
     return {panel, source, view, at, pick, dispatch, finish, monitors, chrome, themeActors,
-        DND, allocate, idles, timeouts, registrations, activatedWindows, makeWindow, pointer, logs};
+        DND, allocate, idles, timeouts, registrations, activatedWindows, makeWindow, pointer, pressAt, logs};
 }
 
 describe('Dash drag and drop', () => {
+    it('gives Launchpad, +N and apps equal button sizes and matching indicator space in both layouts', async () => {
+        for (const scale of [1, 1.5, 2]) {
+            const f = await fixture(scale);
+            for (const width of [1000, 200]) {
+                const p = f.panel(0, width * scale);
+                const size = width === 1000 ? 40 : 32;
+                expect(p._layout.iconSize).toBe(size);
+                const checkItems = actors => {
+                    const items = actors.filter(actor => actor.indicators);
+                    expect(items.length).toBeGreaterThan(1);
+                    const heights = [];
+                    for (const item of items) {
+                        const content = item.child;
+                        const buttonActor = content.get_children()[0];
+                        const button = item.button ?? buttonActor;
+                        expect(button.width).toBe(size * scale);
+                        expect(button.height).toBe(size * scale);
+                        expect(buttonActor.width).toBe(size * scale);
+                        expect(buttonActor.height).toBe(size * scale);
+                        expect(content.vertical).toBeTrue();
+                        expect(content.y_align).toBe(1);
+                        expect(content.get_children()[1]).toBe(item.indicators);
+                        expect(item.indicators.style_class).toBe('dash-window-dots');
+                        heights.push(item.height);
+                        if (button.style_class?.includes('dash-launchpad')) {
+                            expect(button.child.width).toBe(size * scale);
+                            expect(button.child.height).toBe(size * scale);
+                            expect(button.child.get_children().length).toBe(9);
+                        }
+                    }
+                    expect(new Set(heights).size).toBe(1);
+                };
+                checkItems(p._dash.get_children());
+                expect(p._dash.get_children()[0].width).toBe((size + 8) * scale);
+                if (width === 200) {
+                    const overflow = p._dash.get_children().at(-1);
+                    expect(overflow.child.get_children()[0].style_class).toContain('dash-overflow-button');
+                    expect(overflow.child.get_children()[0].child.style).toBe('font-size: 21px;');
+                    p._openExpanded();
+                    checkItems(p._expandedSurface._content.child.get_children()[0].get_children());
+                }
+                p.destroy();
+            }
+        }
+    });
+
+    it('starts input only on the icon button, while the separate dots still accept drops', async () => {
+        const f = await fixture();
+        const p = f.panel();
+        const source = f.view(p, 'terminal');
+        const target = f.view(p, 'settings');
+        const point = f.at(target);
+        expect(f.pressAt(p, point)).toBe(target.button);
+        f.pointer(target, 'end');
+        expect(f.activatedWindows).toEqual([f.source.windows[1]]);
+        const [x, y] = target.indicators.get_transformed_position();
+        const dotsPoint = [x + target.indicators.width / 2, y + target.indicators.height / 2];
+        expect(f.pressAt(p, dotsPoint)).toBeNull();
+        expect(target.dragging).toBeFalse();
+        const [startX, startY] = f.at(source);
+        f.pointer(source, 'press');
+        f.pointer(source, 'move', [startX + 20, startY]);
+        expect(f.dispatch('hover', source, p, dotsPoint)).toBe(f.DND.DragMotionResult.MOVE_DROP);
+        expect(f.dispatch('drop', source, p, dotsPoint)).toBeTrue();
+        f.finish(source);
+    });
+
     for (const gestures of [false, true]) {
         it(`starts on pointer movement without activating the app (Shell ${gestures ? '49' : '45–48'})`, async () => {
             const f = await fixture(1, gestures);
@@ -369,12 +477,12 @@ describe('Dash drag and drop', () => {
         const app = f.source.favorites[0];
         const p = f.panel(1);
         const icon = f.view(p, 'firefox');
-        icon.menu.items.find(item => item.label.text === 'New Window').activate();
+        icon.button.menu.items.find(item => item.label.text === 'New Window').activate();
         expect(f.source.launches).toEqual([[app, 1]]);
         app.get_app_info = () => ({list_actions: () => ['new-window'],
             get_action_name: () => 'New Window'});
-        icon._populateMenu();
-        icon.menu.items.find(item => item.label.text === 'New Window').activate();
+        icon.button._populateMenu();
+        icon.button.menu.items.find(item => item.label.text === 'New Window').activate();
         expect(f.source.desktopActions).toEqual([[app, 'new-window', 1]]);
     });
 
@@ -460,7 +568,7 @@ describe('Dash drag and drop', () => {
         expect(p.get_children()).toEqual([p._surface]);
         expect(p._surface.get_children()).toEqual([p._frame]);
         expect(p._frame.get_children()).toEqual([p._dash]);
-        expect(f.pick(p, ...f.at(target, true))).toBe(target);
+        expect(target.contains(f.pick(p, ...f.at(target, true)))).toBeTrue();
         expect(f.dispatch('hover', dragged, p, f.at(target, true))).toBe(f.DND.DragMotionResult.MOVE_DROP);
         expect(f.dispatch('drop', dragged, p, f.at(target, true))).toBe(true);
         expect(f.source.changes).withContext('changes wait until DND releases its actors').toEqual([]);
@@ -626,17 +734,17 @@ describe('Dash drag and drop', () => {
             expect(expanded.height).toBeLessThanOrEqual(600 * scale);
             expect(p._dash.visible).toBe(false);
             const icon = [...p._dragDrop._icons].find(view => view.draggable && expanded.contains(view));
-            icon.menu.open();
-            expect(registration.relatedActors.has(icon.menu.actor)).toBe(true);
+            icon.button.menu.open();
+            expect(registration.relatedActors.has(icon.button.menu.actor)).toBe(true);
             icon.draggable.emit('drag-begin');
             expect(registration.paused).toBe(true);
             f.finish(icon);
             expect(registration.paused).toBe(false);
-            icon.menu.open();
+            icon.button.menu.open();
             registration.dismiss();
             expect(p._expandedSurface).toBe(null);
             expect(p._dash.visible).toBe(true);
-            expect(icon.menu.destroyed).toBe(true);
+            expect(icon.button.menu.destroyed).toBe(true);
             expect(f.registrations.size).toBe(0);
             expect(f.chrome.size).toBe(0);
             expect(f.themeActors.size).toBe(0);

@@ -1,10 +1,12 @@
+@use 'sass:list';
+
 .dash-app-button,
 .dash-app-button:hover,
 .dash-app-button:active,
 .dash-app-button:focus {
     background-color: transparent;
     border: none;
-    border-radius: 0;
+    border-radius: 6px;
     box-shadow: none;
     font-weight: 600;
     padding: 0;
@@ -12,19 +14,27 @@
     -natural-hpadding: 0;
 }
 
-.dash-hover-highlight {
-    border-radius: 0;
-}
-
 .dash-window-dots {
-    spacing: 2px;
-    padding-top: 3px;
+    spacing: 4px;
+    padding-top: 2px;
+    min-height: 5px;
 }
 
 .dash-window-dot {
-    width: 3px;
-    height: 3px;
-    border-radius: 1.5px;
+    width: 5px;
+    height: 5px;
+    border-radius: 2.5px;
+}
+
+.dash-launchpad-tile {
+    border-radius: 3px;
+}
+
+$launchpad-colors: #2bbcb1, #efb744, #ef8849, #bfc0c4, #08ace3, #e45b75, #4b8de0, #b275d0, #59c7b0;
+@for $index from 0 through 8 {
+    .dash-launchpad-tile-#{$index} {
+        background-color: list.nth($launchpad-colors, $index + 1);
+    }
 }
 
 .dash-drop-preview {
