@@ -145,6 +145,12 @@ Valid drop targets show a translucent 16px app-icon preview at the insertion
 point, without resizing the dash. Its size and opacity live in `src/constant.js`.
 Shell state continues updating during a drag. Only the dragged dash’s view
 rebuild waits until drag actors are released; other panels update immediately.
+Click handling uses Shell's native DND/ClickAction integration on GNOME 45–48
+and cooperating Clutter gestures on GNOME 49. Journal messages prefixed
+`[dash-dnd]` report presses, drag starts, cancellation/end, accepted drops and
+applied orders. Rejected targets include a reason; repeated hover events over
+the same rejected target are suppressed. Pressing Firefox or Files reports that
+these fixed favorites cannot be dragged.
 All stub code has been removed. The former stub launcher opens dash preferences.
 
 The extension runtime needs no bundler or package manager. Rollup bundles the GJS

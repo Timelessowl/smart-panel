@@ -79,7 +79,27 @@ export function createDoubles(Actor) {
     }
     class ClickAction extends SignalObject {
         get_button() { return this.button ?? 1; }
-        release() { this.released = true; }
+        get_coords() { return this.coords; }
+        press(coords, button = 1) {
+            this.coords = coords;
+            this.button = button;
+            this.held = true;
+            this.emit('long-press', this.actor, 'query');
+        }
+        move(coords) {
+            if (this.held && Math.hypot(coords[0] - this.coords[0], coords[1] - this.coords[1]) > 8) {
+                this.held = false;
+                this.emit('long-press', this.actor, 'cancel');
+            }
+        }
+        end() {
+            if (this.held) {
+                this.held = false;
+                this.emit('long-press', this.actor, 'cancel');
+                this.emit('clicked');
+            }
+        }
+        release() { this.held = false; this.released = true; }
     }
     return {PanelMenu: {Button}, PopupMenu: {PopupMenu, PopupMenuManager}, ClickAction, uiGroup};
 }

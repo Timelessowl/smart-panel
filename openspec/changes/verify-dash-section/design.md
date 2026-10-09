@@ -144,8 +144,11 @@ The arrow points down so menus open above the bottom dash. Native hide/destroy
 paths close and release menus; open-state signals keep expanded-dash dismissal
 aware of related menu actors.
 
-A native `Clutter.ClickAction` activates apps on left-click/touch release and is
-cancelled at drag begin. Event handling keeps right-click/Menu key for the popup
+A native `Clutter.ClickAction` activates apps on left-click/touch release on
+GNOME 45–48. Draggable icons attach it through Shell DND's `addClickAction()`;
+this bridges press capture and long-press cancellation into native drag start.
+GNOME 49 uses `Clutter.ClickGesture` alongside Shell's native DND gesture.
+Moving into a drag cancels click activation. Event handling keeps right-click/Menu key for the popup
 and Enter/Space for activation; other popup keyboard navigation stays native.
 Desktop actions, monitor-scoped launches and favorite eligibility are evaluated
 when filling the popup directly.

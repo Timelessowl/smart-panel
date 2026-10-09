@@ -27,6 +27,7 @@ export class DashDragDrop {
         this._previewDraggable = null;
         this._previewDragEndId = 0;
         this._destroyed = false;
+        this._lastRejection = null;
         this._dropMonitor = {
             dragMotion: event => {
                 const inside = event.targetActor && (section.contains(event.targetActor) ||
@@ -68,9 +69,11 @@ export class DashDragDrop {
         this._icons.add(icon);
         icon.dragDrop = this;
         if (!(icon.entry.hardcoded && icon.entry.group === 'favorites')) {
-            icon.draggable = DND.makeDraggable(icon, {restoreOnSuccess: false});
+            icon.enableDragging(DND.makeDraggable(icon, {restoreOnSuccess: false}));
             icon.draggable.connect('drag-begin', () => this._dragStarted(icon));
-            icon.draggable.connect('drag-end', () => {
+            icon.draggable.connect('drag-cancelled', () => this._log('cancelled', icon));
+            icon.draggable.connect('drag-end', (_draggable, _time, success) => {
+                this._log('ended', icon, `success=${Boolean(success)}`);
                 if (icon.dragging)
                     this._dragEnded(icon);
             });
@@ -87,9 +90,20 @@ export class DashDragDrop {
         return DashLayout.scaleDimension(value, this._scaleFactor);
     }
 
+    _log(event, icon, detail = '') {
+        console.info(`[dash-dnd] ${event} monitor=${this._section?._monitorIndex} ` +
+            `app=${icon?.item?.appId ?? 'external'} ${detail}`.trimEnd());
+    }
+
+    notePress(icon) {
+        this._log('press', icon, icon.draggable ? 'draggable=true' : 'fixed favorite; dragging disabled');
+    }
+
     _dragStarted(icon) {
         if (this._destroyed)
             return;
+        this._log('started', icon, `group=${icon.entry.group}`);
+        this._lastRejection = null;
         icon.setDragging(true);
         this._dragging = true;
         this._expandedSurface?.setDragging(true);
@@ -173,26 +187,35 @@ export class DashDragDrop {
         return nearest;
     }
 
-    _canDrop(source, target, after) {
+    _dropRejection(source, target, after) {
         if (this._destroyed)
-            return false;
+            return 'dash destroyed';
         const entry = source instanceof DashIcon ? source.entry : null;
-        if (!entry || (entry.group === 'favorites' && entry.hardcoded))
-            return false;
+        if (!entry)
+            return 'unsupported drag source';
+        if (entry.group === 'favorites' && entry.hardcoded)
+            return 'fixed favorite';
         if (target.group === 'running')
-            return entry.group === 'running';
+            return entry.group === 'running' ? null : 'favorites cannot be moved into running';
         if (!this._source.canReorderFavorite(entry.item.app) ||
             (!this._source.isFavorite(entry.item.appId) && !this._source.canSetFavorite(entry.item.app)))
-            return false;
+            return 'application cannot be reordered or added to favorites';
         const fixed = this._entries.favorites.filter(item => item.hardcoded);
-        return !target.hardcoded || (after && target === fixed.at(-1));
+        return !target.hardcoded || (after && target === fixed.at(-1))
+            ? null : 'cannot insert before fixed favorites';
     }
 
     dragOver(source, target, after, targetView) {
-        if (!this._canDrop(source, target, after)) {
+        const reason = this._dropRejection(source, target, after);
+        if (reason) {
+            const rejection = `${source?.item?.id}:${target.item.id}:${after}:${reason}`;
+            if (rejection !== this._lastRejection)
+                this._log('hover rejected', source, `target=${target.item.appId} reason=${reason}`);
+            this._lastRejection = rejection;
             this.clearPreview();
             return DND.DragMotionResult.NO_DROP;
         }
+        this._lastRejection = null;
         this._showDropPreview(source, targetView, after);
         return DND.DragMotionResult.MOVE_DROP;
     }
@@ -246,9 +269,13 @@ export class DashDragDrop {
 
     drop(source, target, after) {
         this.clearPreview();
-        if (this._dropId || !this._canDrop(source, target, after))
+        const reason = this._dropId ? 'another drop is pending' : this._dropRejection(source, target, after);
+        if (reason) {
+            this._log('drop rejected', source, `target=${target.item.appId} reason=${reason}`);
             return false;
+        }
         const entry = source.entry;
+        this._log('drop accepted', source, `target=${target.item.appId} after=${after} group=${target.group}`);
         // DND must finish releasing its actors before any icon is rebuilt.
         this._dropId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
             this._dropId = 0;
@@ -262,6 +289,7 @@ export class DashDragDrop {
                 const remaining = order.filter(id => id !== sourceKey);
                 remaining.splice(remaining.indexOf(targetKey) + (after ? 1 : 0), 0, sourceKey);
                 this.orders[favorites ? 'favoriteOrder' : 'runningOrder'] = remaining;
+                this._log('order applied', source, `group=${target.group} order=${remaining.join(',')}`);
             }
             if (favorites && !this._source.isFavorite(entry.item.appId))
                 this._source.setFavorite(entry.item.app, true);

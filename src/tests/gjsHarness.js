@@ -6,7 +6,7 @@ export const sourceDirectory = Url.pathToFileURL(`${process.cwd()}/src/`);
 
 // Evaluate production GJS modules against narrow API doubles, without GNOME.
 export async function loadGjsModule(path, imports, globals = {}) {
-    const context = VM.createContext({...globals, console});
+    const context = VM.createContext({console, ...globals});
     const modules = new Map();
     async function load(url) {
         if (modules.has(url))

@@ -3,7 +3,7 @@ import {SignalObject} from '@/tests/gjsHarness.js';
 import * as Constants from '@/constant.js';
 import * as PanelMenuDoubles from '@/tests/panelMenu.js';
 
-async function fixture(scale = 1) {
+async function fixture(scale = 1, gestures = false) {
     class Actor extends SignalObject {
         constructor(props = {}) {
             super();
@@ -22,7 +22,11 @@ async function fixture(scale = 1) {
             this.child = child;
             if (child) this.add_child(child);
         }
-        add_action(action) { this.action = action; }
+        add_action(action) { action.actor = this; this.action = action; }
+        remove_action(action) {
+            if (this.action === action) this.action = null;
+            action.actor = null;
+        }
         insert_child_below(child, sibling) {
             child.parent = this;
             this.children.splice(this.children.indexOf(sibling), 0, child);
@@ -73,16 +77,60 @@ async function fixture(scale = 1) {
     const idles = new Map();
     const timeouts = new Map();
     let nextIdle = 1;
+    const redraws = [];
+    const logs = [];
+    // Shell 45–48 bridges ClickAction cancellation to a drag on the next
+    // redraw, after checking whether the release was an ordinary click.
+    class Draggable extends SignalObject {
+        constructor(actor) {
+            super();
+            this.actor = actor;
+            if (gestures) this.addClickAction = undefined;
+        }
+        addClickAction(action) {
+            action.connect('clicked', () => { this.clicked = true; });
+            action.connect('long-press', (_action, _actor, state) => {
+                if (state === 'cancel') redraws.push(() => {
+                    if (!this.clicked) {
+                        action.release();
+                        this.emit('drag-begin', 123);
+                    }
+                    this.clicked = false;
+                });
+            });
+            this.actor.add_action(action);
+        }
+        fakeRelease() {}
+    }
+    class ClickGesture extends SignalObject {
+        constructor(params) { super(); this.params = params; }
+        press(coords, button = 1) {
+            this.coords = coords;
+            this.held = button === 0 || button === this.params.required_button;
+            this.emit('should-handle-sequence', {
+                type: () => button === 0 ? 3 : 1, get_button: () => button,
+            });
+        }
+        move(coords) {
+            if (this.held && Math.hypot(coords[0] - this.coords[0], coords[1] - this.coords[1]) > 8) {
+                this.held = false;
+                this.actor.draggable?.emit('drag-begin', 123);
+            }
+        }
+        end() { if (this.held) this.emit('recognize'); this.held = false; }
+    }
     const DND = {
         DragMotionResult: {CONTINUE: 0, NO_DROP: 1, MOVE_DROP: 2},
         DragDropResult: {CONTINUE: 0},
-        makeDraggable: () => new SignalObject(),
+        makeDraggable: actor => new Draggable(actor),
         addDragMonitor: monitor => monitors.add(monitor),
         removeDragMonitor: monitor => monitors.delete(monitor),
     };
     const imports = {
         'gi://Clutter': {default: {BinLayout: class {}, FixedLayout: class {},
-            ActorAlign: {FILL: 0, CENTER: 1}, ClickAction: nativeMenus.ClickAction}},
+            ActorAlign: {FILL: 0, CENTER: 1}, ClickAction: nativeMenus.ClickAction,
+            ...(gestures ? {ClickGesture} : {}), LongPressState: {QUERY: 'query'},
+            EventType: {BUTTON_PRESS: 1, TOUCH_BEGIN: 3}}},
         'gi://GLib': {default: {PRIORITY_DEFAULT_IDLE: 0, PRIORITY_DEFAULT: 0, SOURCE_REMOVE: false,
             timeout_add: (_priority, _delay, callback) => {
                 const id = nextIdle++; timeouts.set(id, callback); return id;
@@ -113,7 +161,8 @@ async function fixture(scale = 1) {
     };
     const {DashSection} = await GjsHarness.loadGjsModule(
         new URL('components/dashSection.js', GjsHarness.sourceDirectory), imports,
-        {global: {display: {get_n_monitors: () => 2},
+        {console: {info: message => logs.push(message)},
+            global: {display: {get_n_monitors: () => 2},
             settings: {is_writable: () => true}, get_current_time: () => 123}});
     const {DashSource} = await GjsHarness.loadGjsModule(
         new URL('components/dash/dashSource.js', GjsHarness.sourceDirectory), imports);
@@ -229,11 +278,91 @@ async function fixture(scale = 1) {
         }
     }
     const view = (section, appId) => [...section._dragDrop._icons].find(icon => icon.item.appId === appId);
+    function pointer(icon, phase, coords = at(icon), button = 1) {
+        icon.action[phase](coords, button);
+        for (const redraw of redraws.splice(0)) redraw();
+    }
     return {panel, source, view, at, pick, dispatch, finish, monitors, chrome, themeActors,
-        DND, allocate, idles, timeouts, registrations, activatedWindows, makeWindow};
+        DND, allocate, idles, timeouts, registrations, activatedWindows, makeWindow, pointer, logs};
 }
 
 describe('Dash drag and drop', () => {
+    for (const gestures of [false, true]) {
+        it(`starts on pointer movement without activating the app (Shell ${gestures ? '49' : '45–48'})`, async () => {
+            const f = await fixture(1, gestures);
+            const p = f.panel();
+            const icon = f.view(p, 'terminal');
+            const [x, y] = f.at(icon);
+            f.pointer(icon, 'press', [x, y]);
+            expect(icon.dragging).toBeFalse();
+            f.pointer(icon, 'move', [x + 20, y]);
+            expect(icon.dragging).toBeTrue();
+            f.pointer(icon, 'end');
+            expect(f.activatedWindows).toEqual([]);
+            const target = f.view(p, 'settings');
+            expect(f.dispatch('drop', icon, p, f.at(target, true))).toBeTrue();
+            f.finish(icon);
+            expect(p._dragDrop.orders.runningOrder).toEqual(['app:settings', 'app:terminal', 'app:calendar']);
+            expect(f.logs.some(line => line.includes('started monitor=0 app=terminal'))).toBeTrue();
+            expect(f.logs.some(line => line.includes('order applied'))).toBeTrue();
+        });
+
+        it(`keeps ordinary clicks and fixed favorites working (Shell ${gestures ? '49' : '45–48'})`, async () => {
+            const f = await fixture(1, gestures);
+            const p = f.panel();
+            const icon = f.view(p, 'terminal');
+            f.pointer(icon, 'press');
+            f.pointer(icon, 'end');
+            expect(icon.dragging).toBeFalse();
+            expect(f.activatedWindows).toEqual([f.source.windows[0]]);
+            const fixed = f.view(p, 'firefox');
+            const [x, y] = f.at(fixed);
+            f.pointer(fixed, 'press');
+            f.pointer(fixed, 'move', [x + 20, y]);
+            f.pointer(fixed, 'end');
+            expect(fixed.draggable).toBeUndefined();
+            expect(fixed.dragging).toBeFalse();
+            expect(f.logs.some(line => line.includes('fixed favorite; dragging disabled'))).toBeTrue();
+            f.pointer(fixed, 'press');
+            f.pointer(fixed, 'end');
+            expect(f.source.launches).toEqual([[f.source.favorites[0], 0]]);
+        });
+
+        it(`distinguishes a touch tap from a touch drag (Shell ${gestures ? '49' : '45–48'})`, async () => {
+            const f = await fixture(1, gestures);
+            const p = f.panel();
+            const icon = f.view(p, 'terminal');
+            const [x, y] = f.at(icon);
+            f.pointer(icon, 'press', [x, y], 0);
+            f.pointer(icon, 'end');
+            expect(f.activatedWindows).toEqual([f.source.windows[0]]);
+            f.pointer(icon, 'press', [x, y], 0);
+            f.pointer(icon, 'move', [x, y + 20]);
+            expect(icon.dragging).toBeTrue();
+            f.pointer(icon, 'end');
+            expect(f.activatedWindows.length).toBe(1);
+            f.finish(icon);
+        });
+    }
+
+    it('logs rejected targets once per hover and reports cancellation', async () => {
+        const f = await fixture();
+        const p = f.panel();
+        const icon = f.view(p, 'editor');
+        const [x, y] = f.at(icon);
+        f.pointer(icon, 'press');
+        f.pointer(icon, 'move', [x + 20, y]);
+        const target = f.view(p, 'terminal');
+        for (let i = 0; i < 3; i++)
+            f.dispatch('hover', icon, p, f.at(target));
+        expect(f.logs.filter(line => line.includes('hover rejected')).length).toBe(1);
+        expect(f.logs.some(line => line.includes('favorites cannot be moved into running'))).toBeTrue();
+        icon.draggable.emit('drag-cancelled', 123);
+        f.finish(icon);
+        expect(f.logs.some(line => line.includes('cancelled monitor=0 app=editor'))).toBeTrue();
+        expect(icon.dragging).toBeFalse();
+    });
+
     it('favorite menu launches carry the owning dash monitor', async () => {
         const f = await fixture();
         f.source.monitorOnly = true;
@@ -469,7 +598,10 @@ describe('Dash drag and drop', () => {
         const views = [...p._dragDrop._icons].filter(icon => grid.contains(icon));
         const dragged = views.find(icon => icon.item.appId === 'calendar');
         const target = views.find(icon => icon.item.appId === 'terminal');
-        dragged.draggable.emit('drag-begin');
+        const [startX, startY] = f.at(dragged);
+        f.pointer(dragged, 'press');
+        f.pointer(dragged, 'move', [startX + 20, startY]);
+        expect(dragged.dragging).toBeTrue();
         expect(f.dispatch('hover', dragged, surface, f.at(target))).toBe(f.DND.DragMotionResult.MOVE_DROP);
         expect(p._dragDrop._dropPreview).toBeTruthy();
         const [x, y] = target.get_transformed_position();

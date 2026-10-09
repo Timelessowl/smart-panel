@@ -99,13 +99,38 @@ export class DashIcon extends PanelMenuButton {
                 dots.add_child(new St.Widget({style_class: 'dash-window-dot'}));
         }
         this.add_child(new DashButtonContent(this._icon, dots));
-        this._clickAction = new Clutter.ClickAction();
-        this._clickAction.connect('clicked', action => {
-            // ClickAction also handles touch; a drag cancels it before release.
-            if (!this._dragging && action.get_button() <= 1)
-                this._owner.activateEntry(this.entry);
-        });
-        this.add_action(this._clickAction);
+        // Shell 49 uses cooperating gestures; older Shells require DND's
+        // addClickAction() bridge so a captured press can become a drag.
+        const ClickGesture = /** @type {typeof Clutter & {
+            ClickGesture?: new (params: {required_button: number}) => Clutter.Action
+        }} */ (Clutter).ClickGesture;
+        this._clickAction = null;
+        if (ClickGesture) {
+            const gesture = new ClickGesture({required_button: 1});
+            gesture.connect('should-handle-sequence', (_gesture, event) => {
+                if (event.type() === Clutter.EventType.TOUCH_BEGIN ||
+                    (event.type() === Clutter.EventType.BUTTON_PRESS && event.get_button() === 1))
+                    this.dragDrop?.notePress(this);
+                return true;
+            });
+            gesture.connect('recognize', () => {
+                if (!this._dragging)
+                    this._owner.activateEntry(this.entry);
+            });
+            this.add_action(gesture);
+        } else {
+            this._clickAction = new Clutter.ClickAction();
+            this._clickAction.connect('long-press', (_action, _actor, state) => {
+                if (state === Clutter.LongPressState.QUERY)
+                    this.dragDrop?.notePress(this);
+                return true;
+            });
+            this._clickAction.connect('clicked', action => {
+                if (!this._dragging && action.get_button() <= 1)
+                    this._owner.activateEntry(this.entry);
+            });
+            this.add_action(this._clickAction);
+        }
         this._populateMenu();
         this.connect('destroy', () => { this._owner = null; });
     }
@@ -130,17 +155,28 @@ export class DashIcon extends PanelMenuButton {
                 this._populateMenu();
         }
         // Do not let PanelMenu's default event handler open a menu on left press.
-        // Normal popup navigation and ClickAction receive the remaining events.
+        // Normal popup navigation and click handling receive the remaining events.
         return Clutter.EVENT_PROPAGATE;
     }
 
     get dragging() { return this._dragging; }
 
+    enableDragging(draggable) {
+        this.draggable = draggable;
+        if (this._clickAction) {
+            const nativeDrag = /** @type {typeof draggable & {
+                addClickAction(action: Clutter.ClickAction): void
+            }} */ (draggable);
+            this.remove_action(this._clickAction);
+            nativeDrag.addClickAction(this._clickAction);
+        }
+    }
+
     setDragging(dragging) {
         this._dragging = dragging;
         if (dragging) {
             this.menu.close();
-            this._clickAction.release();
+            this._clickAction?.release();
         }
     }
 
@@ -162,8 +198,8 @@ export class DashIcon extends PanelMenuButton {
 
     _toggleMenu() {
         this._populateMenu();
-        this._clickAction.release();
-        this.draggable?.fakeRelease();
+        this._clickAction?.release();
+        this.draggable?.fakeRelease?.();
         this.menu.toggle();
     }
 
