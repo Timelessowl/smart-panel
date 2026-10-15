@@ -4,3 +4,4 @@ build/
 dist-tests/
 docs/api/
 releases/
+examples/

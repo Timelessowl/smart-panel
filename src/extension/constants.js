@@ -52,3 +52,18 @@ export const SettingsKeys = Object.freeze({
     WINDOW_GROUPING: 'group-open-windows',
     ISOLATE_TASKS: 'isolate-tasks',
 });
+
+export const WINDOW_PREVIEW_MAX_WIDTH = 250;
+export const WINDOW_PREVIEW_MAX_HEIGHT = 150;
+export const WINDOW_PREVIEW_OPEN_DELAY = 300;
+export const WINDOW_PREVIEW_CLOSE_DELAY = 250;
+export const WINDOW_PREVIEW_PEEK_DELAY = 500;
+export const WINDOW_PREVIEW_PEEK_OPACITY = 40;
+export const WINDOW_PREVIEW_FADE_TIME = 200;
+export const WINDOW_PREVIEW_TEXTURE_RETRY_DELAY = 50;
+export const WINDOW_PREVIEW_TEXTURE_ATTEMPTS = 15;
+export const WINDOW_PREVIEW_MARGIN = 10;
+export const WINDOW_PREVIEW_SPACING = 8;
+export const WINDOW_PREVIEW_PADDING = 8;
+export const WINDOW_PREVIEW_HEADER_HEIGHT = 32;
+export const WINDOW_PREVIEW_SCROLL_STEP = 100;

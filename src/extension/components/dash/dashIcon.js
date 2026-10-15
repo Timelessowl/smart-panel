@@ -3,6 +3,7 @@ import GObject from 'gi://GObject';
 import St from 'gi://St';
 import {DashIcon as ShellDashIcon} from '@girs/gnome-shell/ui/dash';
 import * as Main from '@girs/gnome-shell/ui/main';
+import {WindowPreviewMenu} from '@/extension/components/dash/windowPreview.js';
 
 export class DashItem extends St.Bin {
     static {
@@ -61,12 +62,27 @@ export class DashIcon extends ShellDashIcon {
         this.set_size(side, side);
         this.x_align = Clutter.ActorAlign.CENTER;
         this.y_align = Clutter.ActorAlign.CENTER;
+        this._windowPreview = null;
+        this.connect('notify::hover', () => {
+            if (this.hover) this._getWindowPreview().scheduleOpen();
+            else this._windowPreview?.scheduleClose();
+        });
+        this.connect('key-press-event', (_icon, event) => {
+            if (event.get_key_symbol() !== Clutter.KEY_Up)
+                return Clutter.EVENT_PROPAGATE;
+            const preview = this._getWindowPreview();
+            preview.open();
+            if (!preview.isOpen) return Clutter.EVENT_PROPAGATE;
+            preview.actor.navigate_focus(null, St.DirectionType.TAB_FORWARD, false);
+            return Clutter.EVENT_STOP;
+        });
 
         const fixed = entry.hardcoded && entry.group === 'favorites';
         if (fixed && this.draggable.startGesture)
             this.draggable.startGesture.enabled = false;
         this.connect('notify::pressed', () => {
             if (!this.pressed) return;
+            this._windowPreview?.close();
             this.dragDrop?.notePress(this);
             // Shell 45–48 starts DND with a pointer grab rather than a gesture.
             if (fixed) this.draggable.fakeRelease?.();
@@ -78,6 +94,8 @@ export class DashIcon extends ShellDashIcon {
             this._owner.menuChanged(this._menu.actor, open);
         });
         this.connect('destroy', () => {
+            this._windowPreview?.destroy();
+            this._windowPreview = null;
             if (this._menu) {
                 this._owner?.menuChanged(this._menu.actor, false);
                 this._menu.destroy();
@@ -91,8 +109,13 @@ export class DashIcon extends ShellDashIcon {
         return this._draggable;
     }
 
+    _getWindowPreview() {
+        return this._windowPreview ??= new WindowPreviewMenu(this, this._owner);
+    }
+
     activate(button) {
         if (this.dragging) return;
+        this._windowPreview?.close();
         const modifiers = Clutter.get_current_event()?.get_state() ?? 0;
         const newWindow =
             button === Clutter.BUTTON_MIDDLE ||
@@ -107,6 +130,11 @@ export class DashIcon extends ShellDashIcon {
         // Native New Window / desktop new-window actions call this before launch.
         this._owner.prepareLaunch(this.app);
         super.animateLaunch();
+    }
+
+    popupMenu() {
+        this._windowPreview?.close();
+        return super.popupMenu();
     }
 
     _updateRunningStyle() {
