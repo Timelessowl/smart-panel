@@ -79,8 +79,7 @@ export class BottomPanel extends St.Widget {
     _updateGeometry() {
         const monitor = this._monitor;
         const panelHeight = this._scale(Constants.PANEL_HEIGHT);
-        const sectionHeight = this._scale(Constants.SECTION_HEIGHT +
-            (Constants.SECTION_FRAME_WIDTH + Constants.SECTION_BORDER_WIDTH) * 2);
+        const sectionHeight = this._scale(Constants.SECTION_HEIGHT);
         const horizontalPadding = this._scale(Constants.PANEL_HORIZONTAL_PADDING);
         const topPadding = this._scale(Constants.PANEL_TOP_PADDING);
         const bottomPadding = this._scale(Constants.PANEL_BOTTOM_PADDING);

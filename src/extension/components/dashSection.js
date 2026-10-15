@@ -18,13 +18,7 @@ export class DashSection extends BaseSection {
         GObject.registerClass({Signals: {'layout-changed': {}}}, this);
     }
 
-    constructor(
-        source,
-        monitorIndex,
-        themeManager,
-        transientInputManager,
-        scaleFactor = 1
-    ) {
+    constructor(source, monitorIndex, themeManager, transientInputManager, scaleFactor = 1) {
         super();
         this.canExpand = true;
         this.preferredWidth = 0;
@@ -38,16 +32,9 @@ export class DashSection extends BaseSection {
         this._expandedSurface = null;
         this._menuActors = new Set();
         this._actions = new DashActions(source, monitorIndex);
-        this._dragDrop = new DashDragDrop(
-            this,
-            source,
-            themeManager,
-            scaleFactor
-        );
-        const adjustedPadding =
-            Constants.DASH_PADDING - Constants.SECTION_CONTENT_BORDER_WIDTH;
+        this._dragDrop = new DashDragDrop(this, source, themeManager, scaleFactor);
         this._dash = new St.BoxLayout({
-            style: `padding: ${adjustedPadding}px; padding-bottom: 0; spacing: ${Constants.DASH_ITEM_SPACING}px;`,
+            style: `padding: 0 ${Constants.DASH_PADDING}px; spacing: ${Constants.DASH_ITEM_SPACING}px;`,
         });
         this.setSectionContent(this._dash);
         source.connectObject('changed', this.refresh.bind(this), this);
@@ -67,16 +54,9 @@ export class DashSection extends BaseSection {
     }
 
     setAvailableSize(width, maxExpansionHeight) {
-        if (
-            width === this._availableWidth &&
-            maxExpansionHeight === this._maxExpansionHeight
-        )
-            return;
+        if (width === this._availableWidth && maxExpansionHeight === this._maxExpansionHeight) return;
         this._availableWidth = width;
-        this._maxExpansionHeight = Math.max(
-            this._scale(Constants.SECTION_HEIGHT),
-            maxExpansionHeight
-        );
+        this._maxExpansionHeight = Math.max(this._scale(Constants.SECTION_HEIGHT), maxExpansionHeight);
         if (this._dragDrop.deferRefresh()) return;
         this.closeExpanded();
         this._rebuildCollapsed();
@@ -85,15 +65,9 @@ export class DashSection extends BaseSection {
     _rebuildCollapsed() {
         const previousWidth = this.preferredWidth;
         this._dash.destroy_all_children();
-        this._layout = DashLayout.layoutDash(
-            this._entries,
-            this._availableWidth,
-            this._scaleFactor
-        );
-        this.preferredWidth =
-            this._layout.width + this._scale(Constants.DASH_PADDING * 2);
-        for (const token of this._layout.tokens)
-            this._dash.add_child(this._createDashItem(token));
+        this._layout = DashLayout.layoutDash(this._entries, this._availableWidth, this._scaleFactor);
+        this.preferredWidth = this._layout.width;
+        for (const token of this._layout.tokens) this._dash.add_child(this._createDashItem(token));
         this._dragDrop.addDropZone(this._dash);
         this._dash.queue_relayout();
         if (this.preferredWidth !== previousWidth) this.emit('layout-changed');
@@ -109,9 +83,13 @@ export class DashSection extends BaseSection {
                 can_focus: true,
                 width: side,
                 height: side,
+                x_align: Clutter.ActorAlign.CENTER,
+                y_align: Clutter.ActorAlign.CENTER,
                 child: new St.Icon({
                     gicon: IconStorage.getIcon(IconStorage.Icons.LAUNCHPAD),
                     icon_size: this._layout.iconSize,
+                    width: side,
+                    height: side,
                 }),
             });
             button.connect('clicked', () => {
@@ -139,9 +117,7 @@ export class DashSection extends BaseSection {
         if (token.type === 'overflow') {
             const side = this._scale(this._layout.iconSize);
             const text = `+${token.hiddenCount}`;
-            const fontSize = Math.round(
-                this._layout.iconSize * Math.min(0.65, 1.5 / text.length)
-            );
+            const fontSize = Math.round(this._layout.iconSize * Math.min(0.65, 1.5 / text.length));
             const button = new St.Button({
                 width: side,
                 height: side,
@@ -157,12 +133,7 @@ export class DashSection extends BaseSection {
             item.setButton(button);
             return item;
         }
-        const view = new DashIcon(
-            token.entry,
-            this,
-            this._layout.iconSize,
-            this._scaleFactor
-        );
+        const view = new DashIcon(token.entry, this, this._layout.iconSize, this._scaleFactor);
         this._dragDrop.attachIcon(view);
         const item = new DashItem(width, token.entry.indicatorCount);
         item.setButton(view);
@@ -181,7 +152,7 @@ export class DashSection extends BaseSection {
             availableWidth: this._availableWidth,
             maxHeight: this._maxExpansionHeight,
             scaleFactor: this._scaleFactor,
-            createToken: token => this._createDashItem(token),
+            createToken: (token) => this._createDashItem(token),
             dragDrop: this._dragDrop,
             themeManager: this._themeManager,
             transientInputManager: this._transientInputManager,

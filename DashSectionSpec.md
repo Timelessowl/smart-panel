@@ -12,7 +12,7 @@ Mode2 - perWindow mode. Each icon in dash (except Launchpad) represents a Window
 
 # Open Windows indicators
 in Mode1 each icon should have an indicators under it representing the amount of running windows with cap of 4. if 4 or more windows are opened there should be 4 indicators. if no windows are opened there should be no indicators. indicators should not affect the positioning of an icon in any way.
-In Mode2 icons in running section should NOT have indicators as each window is represented by separate icon. However icons in favorite section may have indicators even in mode2 sincr they are always present - up to one indicator. in this case running window should NOT create a separate icon.
+In Mode2 each window-backed icon should have exactly one indicator. Favorite icons with no visible running window should have no indicator. A window represented by a favorite should NOT create a separate icon.
 
 # Sections
 Section should represent the real dash with Favorite apps as well as running apps

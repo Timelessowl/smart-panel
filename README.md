@@ -11,11 +11,12 @@ the bottom of every connected monitor:
 
 The transparent space between pieces remains part of the panel's input area.
 Layout values, panel padding, gaps, and widths can all be changed in
-`src/extension/constants.js`. `SECTION_HEIGHT` is content height only. BottomPanel adds
-`SECTION_FRAME_WIDTH` and `SECTION_BORDER_WIDTH` on both sides when allocating
-sections. `PANEL_HEIGHT` adds those edges plus top and bottom padding to content
-height. Defaults are 64px content, an 8px translucent band, a 1px solid outline,
-82px outer section height, and 122px panel height. Horizontal padding stays inside the full-width
+`src/extension/constants.js`. `CONTENT_HEIGHT` is the 56px content height.
+`SECTION_HEIGHT` includes the 8px frame and 1px border on both sides, for 74px
+total. `PANEL_HEIGHT` adds 8px of padding above and below, for 90px total.
+Dash item widths match their 40px or 32px icons; only the 8px gaps separate them.
+Dash section widths also include the 8px edge padding, frame, and border once.
+Horizontal padding stays inside the full-width
 panel actor, so visual outer spacing never becomes a pass-through gap.
 
 All five section classes derive from the GObject-registered `BaseSection`, which

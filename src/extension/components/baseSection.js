@@ -26,7 +26,7 @@ export class BaseSection extends St.Widget {
     // its opaque child inside the band, rather than underneath an overlay.
     this._frame = new St.Bin({
       style_class: "panel-section-frame",
-      style: `padding: ${Constants.SECTION_FRAME_WIDTH}px; border-width: ${Constants.SECTION_BORDER_WIDTH}px;`,
+      style: `padding: ${Constants.SECTION_FRAME_WIDTH}px; border-width: ${Constants.SECTION_CONTENT_BORDER_WIDTH}px;`,
       x_expand: true,
       y_expand: true,
       x_align: Clutter.ActorAlign.FILL,

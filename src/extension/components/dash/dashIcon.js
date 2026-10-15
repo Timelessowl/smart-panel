@@ -11,7 +11,7 @@ export class DashItem extends St.Bin {
     }
 
     constructor(width, indicatorCount = 0) {
-        super({width});
+        super({width, y_align: Clutter.ActorAlign.CENTER});
         this.indicators = new St.BoxLayout({
             style_class: 'dash-window-dots',
             x_align: Clutter.ActorAlign.CENTER,
@@ -23,7 +23,7 @@ export class DashItem extends St.Bin {
                     style_class: 'dash-window-dot',
                     x_align: Clutter.ActorAlign.CENTER,
                     y_align: Clutter.ActorAlign.CENTER,
-                })
+                }),
             );
     }
 
@@ -31,7 +31,7 @@ export class DashItem extends St.Bin {
         const content = new St.BoxLayout({
             vertical: true,
             x_align: Clutter.ActorAlign.FILL,
-            y_align: Clutter.ActorAlign.FILL,
+            y_align: Clutter.ActorAlign.CENTER,
             y_expand: false,
         });
         content.add_child(actor);
@@ -63,13 +63,15 @@ export class DashIcon extends ShellDashIcon {
         this.x_align = Clutter.ActorAlign.CENTER;
         this.y_align = Clutter.ActorAlign.CENTER;
         this._windowPreview = null;
+        // The draggable clears its signals before our destroy handler runs.
+        // Keep this connection in its own lifetime, outside signalTracker.
+        this.draggable.connect('drag-begin', () => this._windowPreview?.close());
         this.connect('notify::hover', () => {
             if (this.hover) this._getWindowPreview().scheduleOpen();
             else this._windowPreview?.scheduleClose();
         });
         this.connect('key-press-event', (_icon, event) => {
-            if (event.get_key_symbol() !== Clutter.KEY_Up)
-                return Clutter.EVENT_PROPAGATE;
+            if (event.get_key_symbol() !== Clutter.KEY_Up) return Clutter.EVENT_PROPAGATE;
             const preview = this._getWindowPreview();
             preview.open();
             if (!preview.isOpen) return Clutter.EVENT_PROPAGATE;
@@ -78,8 +80,7 @@ export class DashIcon extends ShellDashIcon {
         });
 
         const fixed = entry.hardcoded && entry.group === 'favorites';
-        if (fixed && this.draggable.startGesture)
-            this.draggable.startGesture.enabled = false;
+        if (fixed && this.draggable.startGesture) this.draggable.startGesture.enabled = false;
         this.connect('notify::pressed', () => {
             if (!this.pressed) return;
             this._windowPreview?.close();
@@ -110,18 +111,15 @@ export class DashIcon extends ShellDashIcon {
     }
 
     _getWindowPreview() {
-        return this._windowPreview ??= new WindowPreviewMenu(this, this._owner);
+        return (this._windowPreview ??= new WindowPreviewMenu(this, this._owner));
     }
 
     activate(button) {
         if (this.dragging) return;
         this._windowPreview?.close();
         const modifiers = Clutter.get_current_event()?.get_state() ?? 0;
-        const newWindow =
-            button === Clutter.BUTTON_MIDDLE ||
-            (modifiers & Clutter.ModifierType.CONTROL_MASK) !== 0;
-        if (newWindow && this.app.can_open_new_window())
-            this._owner.openNewWindow(this.app);
+        const newWindow = button === Clutter.BUTTON_MIDDLE || (modifiers & Clutter.ModifierType.CONTROL_MASK) !== 0;
+        if (newWindow && this.app.can_open_new_window()) this._owner.openNewWindow(this.app);
         else this._owner.activateEntry(this.entry);
         Main.overview.hide();
     }

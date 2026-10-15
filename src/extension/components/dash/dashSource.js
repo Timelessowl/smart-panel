@@ -128,7 +128,7 @@ export class DashSource extends GObject.Object {
                           this.getWindowApp(window),
                           window,
                           'running',
-                          0
+                          1
                       )
                   )
             : this.getRunningApps()

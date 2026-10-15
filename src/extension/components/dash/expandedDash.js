@@ -2,6 +2,7 @@ import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
 import * as Main from '@girs/gnome-shell/ui/main';
+import * as Constants from '@/extension/constants.js';
 import {BaseSection} from '@/extension/components/baseSection.js';
 import * as DashLayout from '@/extension/components/dash/dashLayout.js';
 
@@ -32,7 +33,7 @@ export class ExpandedDash extends BaseSection {
             grid.add_child(actor);
         }
         const scroll = new St.ScrollView({style_class: 'dash-expanded-content',
-            style: `padding: ${DashLayout.CONTENT_PADDING}px;`, enable_mouse_scrolling: true,
+            style: `padding: ${Constants.DASH_PADDING}px;`, enable_mouse_scrolling: true,
             overlay_scrollbars: true});
         scroll.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);
         const content = new St.BoxLayout({vertical: true});
@@ -40,9 +41,12 @@ export class ExpandedDash extends BaseSection {
         scroll.set_child(content);
         this.setSectionContent(scroll);
         dragDrop.addDropZone(grid, this);
-        const inset = DashLayout.contentInset(scaleFactor);
-        this.set_size(Math.min(availableWidth, layout.width + inset * 2),
-            Math.min(maxHeight, layout.height + inset * 2));
+        const height = layout.height +
+            2 * DashLayout.scaleDimension(Constants.DASH_PADDING, scaleFactor) +
+            2 * DashLayout.scaleDimension(Constants.SECTION_FRAME_WIDTH, scaleFactor) +
+            2 * DashLayout.scaleDimension(Constants.SECTION_CONTENT_BORDER_WIDTH, scaleFactor);
+        this.set_size(Math.min(availableWidth, DashLayout.sectionWidth(layout.width, scaleFactor)),
+            Math.min(maxHeight, height));
     }
 
     open(anchor) {

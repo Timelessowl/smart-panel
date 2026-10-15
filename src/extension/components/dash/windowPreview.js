@@ -45,7 +45,6 @@ export class WindowPreviewMenu extends PopupMenu.PopupMenu {
 
         // PopupMenu already handles source unmapping and session/system modals.
         // Use its actor as the lifetime owner for our additional connections.
-        source.draggable.connectObject('drag-begin', () => this.close(), this.actor);
         Main.overview.connectObject('showing', () => this.close(), this.actor);
         Main.overview.connectObject(
             'item-drag-begin',

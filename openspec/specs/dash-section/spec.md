@@ -140,9 +140,9 @@ workspaces. Favorites themselves SHALL remain on every panel.
 ### Requirement: Window indicators do not move icons
 
 In per-app mode each app icon SHALL show one dot per visible window, capped at
-four, and no dots for zero windows. In per-window mode favorite icons SHALL show
-at most one dot and running-window icons SHALL show none. Dots SHALL be centered
-below the actual icon, with a five-pixel diameter, four-pixel spacing, and a
+four, and no dots for zero windows. In per-window mode each window-backed icon
+SHALL show one dot; favorite icons without a visible window SHALL show none.
+Dots SHALL be centered below the actual icon, with a five-pixel diameter, four-pixel spacing, and a
 two-pixel gap beneath the icon. They
 SHALL NOT alter its position or size request. Dash button hover highlights SHALL
 be square, centered on their content, with six-pixel rounded corners. Launchpad
@@ -158,7 +158,7 @@ label proportional to icon size, with a transparent background until hovered.
 #### Scenario: Per-window running icon
 
 - **WHEN** a window appears in the running subsection in per-window mode
-- **THEN** its icon has no window-count dots.
+- **THEN** its icon has exactly one running indicator dot.
 
 ### Requirement: Running subsection boundary
 

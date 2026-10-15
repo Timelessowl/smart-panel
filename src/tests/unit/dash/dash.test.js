@@ -58,14 +58,15 @@ describe('Dash entries, layout and actions', () => {
         expect(result.running[0].indicatorCount).toBe(1);
     });
 
-    it('per-window favorites absorb only the first window and running has no dots', () => {
+    it('per-window icons show one dot except favorites without a visible window', () => {
         const result = entries(snapshot({perWindow: true}));
         expect(result.favorites[0].representedWindow.id).toBe('window:1');
         expect(result.favorites[0].item.window).toBeUndefined();
         expect(result.favorites[1].item.app).toBe(files);
         expect(result.favorites[0].indicatorCount).toBe(1);
+        expect(result.favorites[1].indicatorCount).toBe(0);
         expect(result.running.map(entry => entry.item.id)).toEqual(['window:2', 'window:3']);
-        expect(result.running.every(entry => entry.indicatorCount === 0)).toBeTruthy();
+        expect(result.running.map(entry => entry.indicatorCount)).toEqual([1, 1]);
     });
 
     it('monitor filtering retains every favorite but filters dots and running items', () => {
