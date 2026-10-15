@@ -3,9 +3,9 @@ import Shell from 'gi://Shell';
 import St from 'gi://St';
 import * as DND from '@girs/gnome-shell/ui/dnd';
 import * as Main from '@girs/gnome-shell/ui/main';
-import * as Constants from '@/constant.js';
-import {DashIcon} from '@/components/dash/dashIcon.js';
-import * as DashLayout from '@/components/dash/dashLayout.js';
+import * as Constants from '@/extension/constants.js';
+import {DashIcon} from '@/extension/components/dash/dashIcon.js';
+import * as DashLayout from '@/extension/components/dash/dashLayout.js';
 
 // One controller per dash: Shell drag plumbing, temporary previews and local
 // ordering live here. Shared application/window state keeps updating normally.
@@ -68,9 +68,7 @@ export class DashDragDrop {
     attachIcon(icon) {
         this._icons.add(icon);
         icon.dragDrop = this;
-        if (!(icon.entry.hardcoded && icon.entry.group === 'favorites')) {
-            icon.draggable = DND.makeDraggable(icon.button, {restoreOnSuccess: false});
-            icon.button.attachClickAction(icon.draggable);
+        if (icon.draggable) {
             icon.draggable.connect('drag-begin', () => this._dragStarted(icon));
             icon.draggable.connect('drag-cancelled', () => this._log('cancelled', icon));
             icon.draggable.connect('drag-end', (_draggable, _time, success) => {
@@ -97,7 +95,8 @@ export class DashDragDrop {
     }
 
     notePress(icon) {
-        this._log('press', icon, icon.draggable ? 'draggable=true' : 'fixed favorite; dragging disabled');
+        this._log('press', icon, icon.entry.hardcoded && icon.entry.group === 'favorites'
+            ? 'fixed favorite; dragging disabled' : 'draggable=true');
     }
 
     _dragStarted(icon) {
@@ -105,13 +104,13 @@ export class DashDragDrop {
             return;
         this._log('started', icon, `group=${icon.entry.group}`);
         this._lastRejection = null;
-        icon.setDragging(true);
+        icon.dragging = true;
         this._dragging = true;
         this._expandedSurface?.setDragging(true);
     }
 
     _dragEnded(icon) {
-        icon.setDragging(false);
+        icon.dragging = false;
         if (this._destroyed)
             return;
         this._dragging = false;

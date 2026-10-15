@@ -31,7 +31,7 @@ stable identity, metadata, icon creation, and operations.
 `DashSource` owns observation, eligible-window state and complete entry construction.
 `getEntries()` applies monitor scope, mode, local order and indicator rules internally;
 there is no separate projection module. Entries retain native app/window references
-without duplicate window fields. `DashIcon` renders entries and fills a standard
+without duplicate window fields. `DashIcon` renders entries and inherits its native
 native popup menu. `dashUtils` contains `DashActions` for monitor-local activation
 and `DashLaunches` for shared pending launches. No replacement model classes are needed.
 
@@ -92,16 +92,15 @@ the section clips rather than invading search; no extra behavior is invented.
 
 ### Icon buttons and indicators are separate actors
 
-`DashIcon` derives from the shared `DashItem` bin containing a centered vertical
-`St.BoxLayout`. Launchpad and +N use that same bin, including the reserved empty
-indicator row, and follow the dash’s current 40/32 px icon size. The
-column contains the native PanelMenu button's container and a separate indicator
-row. The button is exactly 40 or 32 logical pixels square, with the app texture
-as its only child. Native Bin/Box layouts allocate these actors; there is no
-custom content allocation or hover overlay. Hover styles apply to the button with six-pixel rounded corners. Launchpad
-uses a native homogeneous 3×3 grid of colored rounded tiles filling the icon
-canvas. +N has a label sized to 65% of icon height (reduced for long counts)
-and a transparent background until hovered.
+`DashIcon` derives from Shell's exported `ui/dash.DashIcon`. A separate
+`DashItem` bin arranges that native icon button and the indicator row in a
+vertical box. Launchpad and +N share the same bin, including its reserved empty
+indicator row, and follow the dash’s current 40/32 px icon size. The native
+`IconGrid.BaseIcon` sizes its app texture manually; native shell running-dot
+rendering is suppressed in favor of the source's monitor-scoped counts outside
+the button. There is no custom button allocation, input action or menu builder.
+Hover styles apply directly to the button. Launchpad uses its packaged SVG,
+and +N has a larger label and a transparent background until hovered.
 The five-pixel dots have four-pixel spacing and two pixels of padding above.
 An empty indicator row reserves the same height so button alignment does not
 change with running state. Only the button handles activation, menus and drag
@@ -142,22 +141,13 @@ window opened by the same app while its launch request is pending.
 
 ### Icons use native panel menus
 
-The icon button inside `DashIcon` extends GNOME's `PanelMenu.Button`, uses its standard container and
-`setMenu()` lifecycle, and fills a normal `PopupMenu` with `addAction()`. There is
-no separate menu-descriptor module or custom popup class. A shared native
-`PopupMenuManager` handles grabs, menu switching, Escape and outside clicks.
-The arrow points down so menus open above the bottom dash. Native hide/destroy
-paths close and release menus; open-state signals keep expanded-dash dismissal
-aware of related menu actors.
-
-A native `Clutter.ClickAction` activates apps on left-click/touch release on
-GNOME 45–48. Draggable icons attach it through Shell DND's `addClickAction()`;
-this bridges press capture and long-press cancellation into native drag start.
-GNOME 49 uses `Clutter.ClickGesture` alongside Shell's native DND gesture.
-Moving into a drag cancels click activation. Event handling keeps right-click/Menu key for the popup
-and Enter/Space for activation; other popup keyboard navigation stays native.
-Desktop actions, monitor-scoped launches and favorite eligibility are evaluated
-when filling the popup directly.
+`DashIcon` inherits Shell's menu, right-click/touch/keyboard paths, popup side,
+menu manager, focus/grabs, drag gestures and scale behavior. The extension only
+observes `menu-state-changed` to associate the native menu with expanded-dash
+outside dismissal. Native favorite controls are disabled for fixed launchers.
+Native launch-animation hooks register monitor placement for New Window actions
+before Shell executes them. The inherited drag source remains the native icon;
+no second draggable or ClickAction is installed.
 
 ### Drag acceptance is actor-tree aware
 
@@ -166,11 +156,10 @@ monitoring, drop validation, insertion previews, temporary local orders and
 post-release refresh. `DashSection` supplies source entries and `ExpandedDash` supplies surface updates; the section
 owns its source connection and rendering. It contains no Shell DND plumbing or drag timers.
 
-DND starts on the inner button with its `_delegate` pointing to the containing
-`DashIcon`. Dash/grid and outer section delegates resolve before/after drop
+DND starts on the derived native `DashIcon`, retaining its standard `_delegate`. Dash/grid and outer section delegates resolve before/after drop
 targets for buttons, indicators and padding alike, finding the nearest DashIcon
 in row coordinates after transforming native container/actor positions.
-PanelMenu buttons keep their standard containers. Shared frames and insertion
+Native icons are wrapped by the shared `DashItem` bin. Shared frames and insertion
 previews are hidden from pick. An opaque decorative actor must not
 terminate target traversal before a delegate can be reached.
 
@@ -201,8 +190,9 @@ dragged clone before the queued rebuild.
 ### Menus and preferences use native boundaries
 
 Desktop-file actions, optional New Window, represented-window Close Window, and
-writable/pinnable favorite controls are composed into per-icon PopupMenus.
-The menu manager owns dismissal; removed icons destroy their popup actors.
+favorite controls come from the inherited native AppMenu. Fixed launchers hide
+native favorite controls. Shell owns dismissal; removed icons destroy their
+native menu actors.
 The source updates system favorites through AppFavorites rather than a separate
 extension list. Preferences bind `per-window-mode` and `monitor-only`, both
 boolean/default false, to Adw switch rows; neither local order nor old overlay

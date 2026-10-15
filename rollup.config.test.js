@@ -27,7 +27,10 @@ export default {
         preserveModulesRoot: 'src',
     },
     plugins: [
-        alias({entries: [{find: '@', replacement: src}]}),
+        alias({entries: [
+            {find: '@girs/gnome-shell/ui/dash', replacement: 'resource:///org/gnome/shell/ui/dash.js'},
+            {find: '@', replacement: src},
+        ]}),
         nodeResolve({browser: false, preferBuiltins: true}),
     ],
     external: id => !id.startsWith('@/') && !id.startsWith('.') && !path.isAbsolute(id),

@@ -1,7 +1,7 @@
 import * as Stylesheet from '@/tests/stylesheet.js';
 import * as GjsHarness from '@/tests/gjsHarness.js';
 import {SignalObject} from '@/tests/gjsHarness.js';
-import * as Constants from '@/constant.js';
+import * as Constants from '@/extension/constants.js';
 
 async function fixture() {
     class BinLayout {}
@@ -20,7 +20,7 @@ async function fixture() {
         }
         destroy() { this.children.forEach(child => child.destroy()); this.destroyed = true; }
     }
-    const {BaseSection} = await GjsHarness.loadGjsModule(new URL('components/baseSection.js', GjsHarness.sourceDirectory), {
+    const {BaseSection} = await GjsHarness.loadGjsModule(new URL('extension/components/baseSection.js', GjsHarness.sourceDirectory), {
         'gi://Clutter': {default: {BinLayout, ActorAlign: {FILL: 0}}},
         'gi://GObject': {default: {registerClass: cls => cls}},
         'gi://St': {default: {Widget: Actor, Bin: Actor}},

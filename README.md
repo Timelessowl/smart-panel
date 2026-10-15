@@ -11,7 +11,7 @@ the bottom of every connected monitor:
 
 The transparent space between pieces remains part of the panel's input area.
 Layout values, panel padding, gaps, and widths can all be changed in
-`src/constant.js`. `SECTION_HEIGHT` is content height only. BottomPanel adds
+`src/extension/constants.js`. `SECTION_HEIGHT` is content height only. BottomPanel adds
 `SECTION_FRAME_WIDTH` and `SECTION_BORDER_WIDTH` on both sides when allocating
 sections. `PANEL_HEIGHT` adds those edges plus top and bottom padding to content
 height. Defaults are 64px content, an 8px translucent band, a 1px solid outline,
@@ -26,9 +26,9 @@ plain `canExpand` property. Expandable sections set that property in their own
 constructors. `BottomPanel._updateGeometry()` is the single
 owner of panel and section placement and sizing. Dash and indicators opt into
 expansion; Debian, search, and system sections do not. `SECTION_FRAME_WIDTH` in
-`src/constant.js` changes every frame in one place.
+`src/extension/constants.js` changes every frame in one place.
 
-`src/themeManager.js` follows GNOME 48's system Dark Style preference and applies a
+`src/extension/themeManager.js` follows GNOME 48's system Dark Style preference and applies a
 `.dark` or `.light` class to every monitor panel. The two palettes live in
 `src/style/_themes.scss`. Section surfaces are opaque; the surrounding frame uses 40%
 alpha by default, with an 8px default thickness and a separate 1px opaque outer
@@ -41,7 +41,7 @@ Section content heights are 64 logical pixels and icon sizes are unchanged.
 The dash counts the frame padding and outline once in its width budget and fits
 its rows inside them. Existing control padding avoids a second frame inset.
 Frame alpha is configured in the dark/light frame background colors in `src/style/_themes.scss`;
-band and outline thickness stay in `src/constant.js`. Transparency shows the scene behind
+band and outline thickness stay in `src/extension/constants.js`. Transparency shows the scene behind
 the panel (wallpaper, or a window if one is physically underneath), not an
 extension-owned copy of the wallpaper.
 
@@ -88,14 +88,14 @@ ordering, damage, scaling and cleanup; actual GPU output still needs a GNOME
 48.7 visual check after a Shell restart. The commented original BACKGROUND blur
 in BaseSection is retained for comparison.
 
-`src/monitorManager.js` discovers monitors dynamically and owns one independent
+`src/extension/monitorManager.js` discovers monitors dynamically and owns one independent
 panel instance per monitor. Panels are rebuilt when the monitor layout changes.
 Each panel determines its own scale in its constructor: Wayland uses a factor of
 one, while X11 uses that monitor's `geometry_scale`.
 
 ## Dash
 
-`src/components/dash/` contains one Shell-observing GObject `DashSource`, native `DashIcon`
+`src/extension/components/dash/` contains one Shell-observing GObject `DashSource`, native `DashIcon`
 views, `ExpandedDash`, and dash layout, action and drag/drop helpers.
 The source exposes native `Shell.App` and `Meta.Window` objects through
 `getFavorites()`, `getRunningApps()`, `getOpenedWindows()`,
@@ -133,31 +133,40 @@ Preferences provide two toggles, both off by default:
   windows are left in place. New-window menu actions use the same monitor scope.
 
 Repeated clicks on a multi-window app focus its windows in opening order, then
-minimize all its represented windows, then start the cycle again. Each `DashIcon` is a bin with a centered vertical layout containing a square
-40/32 px icon button and a separate dot row. The empty dot row reserves the same
-space, keeping icons aligned. Launchpad and +N use the same `DashItem` layout
-and follow the current 40/32 px size. Launchpad fills its canvas with nine colored
-rounded tiles; +N uses a larger label and a transparent idle background. Dots are
-5 px with 4 px spacing and a 2 px gap below the icon. Hover corners are rounded.
-The button derives from GNOME's `PanelMenu.Button`
-and uses its standard popup menu, with desktop-file
-actions and favorite/unfavorite controls. A shared native menu manager handles
-menu switching and grabs. Left-click still activates apps; right-click opens the
-menu. `DashDragDrop` owns draggable setup, drop delegates, previews, local order,
+minimize all its represented windows, then start the cycle again. `DashIcon`
+derives directly from GNOME Shell's exported `ui/dash.DashIcon`. Shell supplies
+its native AppMenu, mouse/touch/keyboard handling, drag gestures, focus behavior
+and menu lifecycle. The extension overrides activation for monitor-local window
+selection, launch tracking, icon size and its external window-count indicators.
+Native New Window and desktop new-window menu actions use Shell's launch-animation
+hook to register monitor placement without replacing their action handlers.
+
+A separate `DashItem` bin arranges the 40/32 px button and indicator row. Empty
+rows reserve the same space for apps, Launchpad and +N. Launchpad loads its SVG
+through `IconStorage`; +N uses a larger label and transparent idle background.
+Dots are 5 px with 4 px spacing and a 2 px gap below the icon. Hover corners are
+rounded. Fixed launchers keep native menus but omit favorite changes and cannot
+start a drag.
+
+`DashDragDrop` owns draggable setup, drop delegates, previews, local order,
 and deferred refresh, leaving `DashSection` to assemble the dash and delegate actions. Dragging
 reorders within a subsection on that monitor only; dragging a running item into
 Favorites adds it to GNOME's system favorites. Local ordering is not persisted.
 Valid drop targets show a translucent 16px app-icon preview at the insertion
-point, without resizing the dash. Its size and opacity live in `src/constant.js`.
+point, without resizing the dash. Its size and opacity live in `src/extension/constants.js`.
 Shell state continues updating during a drag. Only the dragged dash’s view
 rebuild waits until drag actors are released; other panels update immediately.
-Click handling uses Shell's native DND/ClickAction integration on GNOME 45–48
-and cooperating Clutter gestures on GNOME 49. Journal messages prefixed
-`[dash-dnd]` report presses, drag starts, cancellation/end, accepted drops and
-applied orders. Rejected targets include a reason; repeated hover events over
-the same rejected target are suppressed. Pressing Firefox or Files reports that
-these fixed favorites cannot be dragged.
+`DashDragDrop` observes the icon's inherited draggable rather than creating a
+second drag handler. Journal messages prefixed `[dash-dnd]` report native presses,
+starts, cancellation/end, accepted drops, applied orders and rejection reasons.
+The installed GI package omits the exported `ui/dash` module; local declarations
+and a Rollup alias map that import directly to Shell's existing resource.
 All stub code has been removed. The former stub launcher opens dash preferences.
+
+`src/extension/` owns the runtime components, managers, constants, settings schema,
+and packaged assets. `src/utils/iconStorage.js` loads the Launchpad SVG through
+`Icons.LAUNCHPAD`, and `src/utils/logger.js` provides the shared debug logger.
+The photographed dash sources use these paths directly.
 
 The extension runtime needs no bundler or package manager. Rollup bundles the GJS
 modules and compiles Sass during development; GNOME imports and native APIs stay
@@ -178,7 +187,7 @@ macOS and Linux. Building also requires GLib's `glib-compile-schemas` on your PA
 (`libglib2.0-bin` on Debian/Ubuntu or `glib2` on Fedora).
 
 The entry points and schema live in `src/extension/`; shared components and Sass
-remain under `src/components/` and `src/style/`. `rollup.config.js` follows the
+remain under `src/extension/components/` and `src/style/`. `rollup.config.js` follows the
 provided configuration: ES modules are preserved, Sass produces `stylesheet.css`,
 metadata is generated from `package.json`, and schemas, assets and translations
 are copied from `src/extension/` before schema compilation.

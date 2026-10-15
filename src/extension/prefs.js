@@ -1,6 +1,7 @@
 import Adw from 'gi://Adw';
 import Gio from 'gi://Gio';
 import {ExtensionPreferences} from '@girs/gnome-shell/extensions/prefs';
+import * as Constants from '@/extension/constants.js';
 
 export default class SimpleBottomPanelPreferences extends ExtensionPreferences {
     async fillPreferencesWindow(window) {
@@ -20,8 +21,8 @@ export default class SimpleBottomPanelPreferences extends ExtensionPreferences {
         });
         group.add(perWindow);
         group.add(monitorOnly);
-        settings.bind('per-window-mode', perWindow, 'active', Gio.SettingsBindFlags.DEFAULT);
-        settings.bind('monitor-only', monitorOnly, 'active', Gio.SettingsBindFlags.DEFAULT);
+        settings.bind(Constants.SettingsKeys.WINDOW_GROUPING, perWindow, 'active', Gio.SettingsBindFlags.DEFAULT);
+        settings.bind(Constants.SettingsKeys.ISOLATE_TASKS, monitorOnly, 'active', Gio.SettingsBindFlags.DEFAULT);
         window.connect('close-request', () => {
             Gio.Settings.unbind(perWindow, 'active');
             Gio.Settings.unbind(monitorOnly, 'active');

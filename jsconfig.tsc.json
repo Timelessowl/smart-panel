@@ -21,7 +21,7 @@
   "include": [
     "src/**/*.ts",
     "src/extension/**/*.js",
-    "src/components/**/*.js",
+    "src/utils/**/*.js",
     "src/externals/**/*.js",
     "src/*.js"
   ]

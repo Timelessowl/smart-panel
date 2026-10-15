@@ -6,7 +6,7 @@ import St from 'gi://St';
 import * as Main from '@girs/gnome-shell/ui/main';
 import * as PopupMenu from '@girs/gnome-shell/ui/popupMenu';
 
-import {BaseSection} from '@/components/baseSection.js';
+import {BaseSection} from '@/extension/components/baseSection.js';
 
 export class DebianButton extends BaseSection {
     static {

@@ -35,7 +35,7 @@ async function fixture({desktopActions = [], canOpen = true, pinnable = true,
         setFavorite: (app, favorite) => calls.push(['favorite', app, favorite]),
         activateEntry: entry => calls.push(['activate', entry])};
     const {DashIcon} = await GjsHarness.loadGjsModule(
-        new URL('components/dash/dashIcon.js', GjsHarness.sourceDirectory), {
+        new URL('extension/components/dash/dashIcon.js', GjsHarness.sourceDirectory), {
             'gi://Clutter': {default: Clutter},
             'gi://GObject': {default: {registerClass: cls => cls}},
             'gi://St': {default: {Widget: Actor, Bin: Actor, BoxLayout: Actor, Side: {BOTTOM: 1}}},

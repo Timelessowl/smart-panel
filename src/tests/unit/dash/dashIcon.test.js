@@ -1,7 +1,7 @@
 import * as Stylesheet from '@/tests/stylesheet.js';
 import * as GjsHarness from '@/tests/gjsHarness.js';
 import {SignalObject} from '@/tests/gjsHarness.js';
-import * as Constants from '@/constant.js';
+import * as Constants from '@/extension/constants.js';
 import * as PanelMenuDoubles from '@/tests/panelMenu.js';
 
 async function fixture(scale) {
@@ -54,7 +54,7 @@ async function fixture(scale) {
         'resource:///org/gnome/shell/ui/popupMenu.js': nativeMenus.PopupMenu,
         'resource:///org/gnome/shell/ui/panelMenu.js': nativeMenus.PanelMenu,
     };
-    const {DashIcon} = await GjsHarness.loadGjsModule(new URL('components/dash/dashIcon.js', GjsHarness.sourceDirectory), imports);
+    const {DashIcon} = await GjsHarness.loadGjsModule(new URL('extension/components/dash/dashIcon.js', GjsHarness.sourceDirectory), imports);
     return {create(iconSize, indicatorCount, rowHeight) {
         const item = {name: 'App', app: {get_app_info: () => null,
             can_open_new_window: () => false, create_icon_texture: () => new Actor({

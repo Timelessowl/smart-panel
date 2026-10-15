@@ -5,13 +5,13 @@ import St from 'gi://St';
 
 import * as Main from '@girs/gnome-shell/ui/main';
 
-import {DashSection} from '@/components/dashSection.js';
-import {DebianButton} from '@/components/debianButton.js';
-import {IndicatorSection} from '@/components/indicatorSection.js';
-import {SearchSection} from '@/components/searchSection.js';
-import {SystemSection} from '@/components/systemSection.js';
+import {DashSection} from '@/extension/components/dashSection.js';
+import {DebianButton} from '@/extension/components/debianButton.js';
+import {IndicatorSection} from '@/extension/components/indicatorSection.js';
+import {SearchSection} from '@/extension/components/searchSection.js';
+import {SystemSection} from '@/extension/components/systemSection.js';
 
-import * as Constants from '@/constant.js';
+import * as Constants from '@/extension/constants.js';
 
 export class BottomPanel extends St.Widget {
     static {

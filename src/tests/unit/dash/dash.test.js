@@ -1,5 +1,5 @@
 import * as GjsHarness from '@/tests/gjsHarness.js';
-import * as DashLayout from '@/components/dash/dashLayout.js';
+import * as DashLayout from '@/extension/components/dash/dashLayout.js';
 let DashSource;
 let DashUtils;
 beforeAll(async () => {
@@ -8,9 +8,9 @@ beforeAll(async () => {
         'resource:///org/gnome/shell/ui/appFavorites.js': {},
         'resource:///org/gnome/shell/ui/main.js': {}};
     ({DashSource} = await GjsHarness.loadGjsModule(
-        new URL('components/dash/dashSource.js', GjsHarness.sourceDirectory), imports));
+        new URL('extension/components/dash/dashSource.js', GjsHarness.sourceDirectory), imports));
     DashUtils = await GjsHarness.loadGjsModule(
-        new URL('components/dash/dashUtils.js', GjsHarness.sourceDirectory), imports);
+        new URL('extension/components/dash/dashUtils.js', GjsHarness.sourceDirectory), imports);
 });
 
 const app = id => ({get_id: () => id, get_name: () => id});

@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
   <schema id="org.gnome.shell.extensions.simple-bottom-panel" path="/org/gnome/shell/extensions/simple-bottom-panel/">
-    <key name="per-window-mode" type="b">
+    <key name="group-open-windows" type="b">
       <default>false</default>
       <summary>Show an icon per window instead of per app</summary>
     </key>
-    <key name="monitor-only" type="b">
+    <key name="isolate-tasks" type="b">
       <default>false</default>
       <summary>Filter running icons and indicators to this monitor</summary>
     </key>

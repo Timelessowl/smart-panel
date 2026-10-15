@@ -1,7 +1,7 @@
-import * as Constants from '@/constant.js';
+import * as Constants from '@/extension/constants.js';
 
 // The native frame already provides the outer band; count it only once.
-export const CONTENT_PADDING = Math.max(0, Constants.DASH_PADDING - Constants.SECTION_FRAME_WIDTH);
+export const CONTENT_PADDING = Constants.DASH_PADDING - Constants.SECTION_CONTENT_BORDER_WIDTH;
 
 export function scaleDimension(value, scale = 1) {
     return Math.round(value * scale);
@@ -36,13 +36,13 @@ export function tokensWidth(tokens, scale = 1) {
 }
 
 // All dimensions are in stage coordinates. Icons use logical pixel sizes.
-export function layoutDash(entries, availableWidth, inset, scale = 1) {
-    const usableWidth = Math.max(0, availableWidth - inset * 2);
+export function layoutDash(entries, availableWidth, scale = 1) {
+    const usableWidth = Math.max(0, availableWidth - scaleDimension(Constants.DASH_PADDING * 2, scale));
     for (const iconSize of [Constants.DASH_ICON_SIZE, Constants.DASH_SMALL_ICON_SIZE]) {
         const tokens = tokensFor(entries, entries.length, iconSize);
         if (tokensWidth(tokens, scale) <= usableWidth)
             return {iconSize, tokens, hiddenCount: 0,
-                width: tokensWidth(tokens, scale) + inset * 2};
+                width: tokensWidth(tokens, scale)};
     }
 
     for (let count = entries.length - 1; count >= 0; count--) {
@@ -50,13 +50,13 @@ export function layoutDash(entries, availableWidth, inset, scale = 1) {
         const tokens = tokensFor(entries, count, Constants.DASH_SMALL_ICON_SIZE, hiddenCount);
         if (tokensWidth(tokens, scale) <= usableWidth)
             return {iconSize: Constants.DASH_SMALL_ICON_SIZE, tokens, hiddenCount,
-                width: tokensWidth(tokens, scale) + inset * 2};
+                width: tokensWidth(tokens, scale)};
     }
 
     // On exceptionally narrow monitors, clip rather than crossing into search.
     const tokens = tokensFor(entries, 0, Constants.DASH_SMALL_ICON_SIZE, entries.length);
     return {iconSize: Constants.DASH_SMALL_ICON_SIZE, tokens, hiddenCount: entries.length,
-        width: Math.min(availableWidth, tokensWidth(tokens, scale) + inset * 2)};
+        width: Math.min(usableWidth, tokensWidth(tokens, scale))};
 }
 
 export function expandedRows(entries, iconSize, usableWidth, scale = 1) {

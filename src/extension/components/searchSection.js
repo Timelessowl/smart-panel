@@ -4,7 +4,7 @@ import St from 'gi://St';
 
 import * as Main from '@girs/gnome-shell/ui/main';
 
-import {BaseSection} from '@/components/baseSection.js';
+import {BaseSection} from '@/extension/components/baseSection.js';
 
 export class SearchSection extends BaseSection {
     static {

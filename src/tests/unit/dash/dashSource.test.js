@@ -60,7 +60,7 @@ async function fixture() {
             favorites.emit('changed');
         }});
     const settings = new SignalObject();
-    const values = {'per-window-mode': false, 'monitor-only': false};
+    const values = {'group-open-windows': false, 'isolate-tasks': false};
     Object.assign(settings, {get_boolean: key => values[key],
         set_boolean(key, value) {
             values[key] = value;
@@ -78,11 +78,11 @@ async function fixture() {
         'resource:///org/gnome/shell/ui/appFavorites.js': {getAppFavorites: () => favorites},
     };
     const shellSettings = {writable: true, is_writable: () => shellSettings.writable};
-    const {DashSource} = await GjsHarness.loadGjsModule(new URL('components/dash/dashSource.js', GjsHarness.sourceDirectory),
+    const {DashSource} = await GjsHarness.loadGjsModule(new URL('extension/components/dash/dashSource.js', GjsHarness.sourceDirectory),
         imports, {global: {display, settings: shellSettings, get_current_time: () => 123}});
     const source = new DashSource(settings);
     const {DashActions} = await GjsHarness.loadGjsModule(
-        new URL('components/dash/dashUtils.js', GjsHarness.sourceDirectory), imports,
+        new URL('extension/components/dash/dashUtils.js', GjsHarness.sourceDirectory), imports,
         {global: {display, get_current_time: () => 123}});
     const actions = new DashActions(source, 0);
     const destroy = () => { actions.destroy(); source.destroy(); };
@@ -143,8 +143,8 @@ describe('Dash source queries and lifecycle', () => {
         const f = await fixture();
         f.makeWindow(f.firefox, 20); f.makeWindow(f.terminal, 10); f.flush();
         expect(f.source.getRunningApps()).toEqual([f.terminal, f.firefox]);
-        f.settings.set_boolean('per-window-mode', true);
-        f.settings.set_boolean('monitor-only', true); f.flush();
+        f.settings.set_boolean('group-open-windows', true);
+        f.settings.set_boolean('isolate-tasks', true); f.flush();
         expect(f.source.perWindow).toBe(true);
         expect(f.source.monitorOnly).toBe(true);
         expect(f.source.getFavorites()).toEqual([f.firefox, f.files, f.terminal]);
@@ -157,14 +157,14 @@ describe('Dash source queries and lifecycle', () => {
         const remote = f.makeWindow(f.firefox, 10, 1);
         f.makeWindow(f.terminal, 20, 0);
         f.makeWindow(editor, 30, 0);
-        f.settings.set_boolean('monitor-only', true); f.flush();
+        f.settings.set_boolean('isolate-tasks', true); f.flush();
         const local = f.source.getEntries({monitor: 0});
         expect(local.favorites[0].indicatorCount).toBe(0);
         expect(f.source.getEntries({monitor: 1}).favorites[0].indicatorCount).toBe(1);
         expect(local.running.map(entry => entry.item.app)).toEqual([editor]);
         remote.monitor = 0;
         f.display.emit('window-entered-monitor', 0, remote);
-        f.settings.set_boolean('per-window-mode', true); f.flush();
+        f.settings.set_boolean('group-open-windows', true); f.flush();
         expect(f.source.getEntries({monitor: 0}).favorites[0].representedWindow).toBe(remote);
         expect(f.source.getEntries({monitor: 1}).favorites[0].representedWindow).toBe(null);
         f.source.setFavorite(editor, true); f.flush();
@@ -223,7 +223,7 @@ describe('Dash source queries and lifecycle', () => {
     it('places a new isolated window on the requesting monitor without moving remote windows', async () => {
         const f = await fixture();
         const remote = f.makeWindow(f.firefox, 1, 1); f.flush();
-        f.settings.set_boolean('monitor-only', true); f.flush();
+        f.settings.set_boolean('isolate-tasks', true); f.flush();
         f.actions.openNewWindow(f.firefox, 0);
         expect(f.firefox.launches).toEqual([['window', -1]]);
         const unrelated = f.makeWindow(f.terminal, 2, 1);
@@ -242,7 +242,7 @@ describe('Dash source queries and lifecycle', () => {
 
     it('launches actions in the same scope and supports simultaneous requests on different monitors', async () => {
         const f = await fixture();
-        f.settings.set_boolean('monitor-only', true); f.flush();
+        f.settings.set_boolean('isolate-tasks', true); f.flush();
         const other = f.makeActions(1);
         f.actions.launchAction(f.firefox, 'new-window');
         other.openNewWindow(f.firefox);
@@ -264,7 +264,7 @@ describe('Dash source queries and lifecycle', () => {
         expect(f.timeouts.size).toBe(0);
         const remote = f.makeWindow(f.firefox, 1, 1); f.flush();
         expect(remote.moves).toEqual([]);
-        f.settings.set_boolean('monitor-only', true); f.flush();
+        f.settings.set_boolean('isolate-tasks', true); f.flush();
         f.actions.openNewWindow(f.firefox, 0); f.expire();
         const later = f.makeWindow(f.firefox, 2, 1); f.flush();
         expect(later.moves).toEqual([]);
@@ -273,7 +273,7 @@ describe('Dash source queries and lifecycle', () => {
 
     it('cleans up failed launches and never moves a window to a removed monitor', async () => {
         const f = await fixture();
-        f.settings.set_boolean('monitor-only', true); f.flush();
+        f.settings.set_boolean('isolate-tasks', true); f.flush();
         f.firefox.open_new_window = () => { throw new Error('Launch failed'); };
         expect(() => f.actions.openNewWindow(f.firefox, 0)).toThrowError('Launch failed');
         expect(f.timeouts.size).toBe(0);

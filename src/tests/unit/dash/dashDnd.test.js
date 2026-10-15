@@ -1,6 +1,6 @@
 import * as GjsHarness from '@/tests/gjsHarness.js';
 import {SignalObject} from '@/tests/gjsHarness.js';
-import * as Constants from '@/constant.js';
+import * as Constants from '@/extension/constants.js';
 import * as PanelMenuDoubles from '@/tests/panelMenu.js';
 
 async function fixture(scale = 1, gestures = false) {
@@ -172,12 +172,12 @@ async function fixture(scale = 1, gestures = false) {
         },
     };
     const {DashSection} = await GjsHarness.loadGjsModule(
-        new URL('components/dashSection.js', GjsHarness.sourceDirectory), imports,
+        new URL('extension/components/dashSection.js', GjsHarness.sourceDirectory), imports,
         {console: {info: message => logs.push(message)},
             global: {display: {get_n_monitors: () => 2},
             settings: {is_writable: () => true}, get_current_time: () => 123}});
     const {DashSource} = await GjsHarness.loadGjsModule(
-        new URL('components/dash/dashSource.js', GjsHarness.sourceDirectory), imports);
+        new URL('extension/components/dash/dashSource.js', GjsHarness.sourceDirectory), imports);
     const theme = {addActor: actor => themeActors.add(actor),
         removeActor: actor => themeActors.delete(actor)};
     const registrations = new Set();

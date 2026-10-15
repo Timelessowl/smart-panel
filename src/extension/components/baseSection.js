@@ -6,7 +6,7 @@ import St from 'gi://St';
 import Shell from 'gi://Shell';
 import { RoundedBackgroundBlur } from '@/externals/roundedBackgroundBlur.js';
 
-import * as Constants from '@/constant.js';
+import * as Constants from '@/extension/constants.js';
 
 export class BaseSection extends St.Widget {
   static {

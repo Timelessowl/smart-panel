@@ -388,7 +388,7 @@ describe('Captured-child rounded background blur', () => {
         expect(f.surface.blur.radius).toBe(0);
         expect(Object.hasOwn(Object.getPrototypeOf(f.surface), 'vfunc_allocate')).toBeFalse();
         expect(() => f.surface.set_child(new f.Actor())).toThrowError(/only have one/);
-        const base = await Files.readFile(new URL('components/baseSection.js', GjsHarness.sourceDirectory), 'utf8');
+        const base = await Files.readFile(new URL('extension/components/baseSection.js', GjsHarness.sourceDirectory), 'utf8');
         expect(base).toContain('//   new Shell.BlurEffect({ mode: Shell.BlurMode.BACKGROUND, radius: 99 }),');
         f.surface.destroy();
     });

@@ -29,7 +29,7 @@ export async function loadGjsModule(path, imports, globals = {}) {
     const root = await load(path.href);
     await root.link((specifier, parent) => {
         if (specifier.startsWith('@/'))
-            return load(new URL(specifier.slice(2), sourceDirectory).href);
+            return load(new URL(`${specifier.slice(2)}${/\.\w+$/.test(specifier) ? '' : '.js'}`, sourceDirectory).href);
         if (specifier.startsWith('@girs/'))
             return load(import.meta.resolve(specifier));
         return load(specifier.startsWith('.')

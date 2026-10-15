@@ -24,7 +24,7 @@ async function fixture() {
         }},
     };
     const {TransientInputManager} = await GjsHarness.loadGjsModule(
-        new URL('transientInputManager.js', GjsHarness.sourceDirectory), imports,
+        new URL('extension/transientInputManager.js', GjsHarness.sourceDirectory), imports,
         {global: {display, get_pointer: () => pointer}});
     return {manager: new TransientInputManager(), display, permissions, ungrabbed,
         click(x, y) { pointer = [x, y, 0]; poll(); pointer = [x, y, 1]; return poll(); }};

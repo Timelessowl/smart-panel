@@ -59,7 +59,10 @@ export default {
     },
     plugins: [
         alias({
-            entries: [{find: '@', replacement: path.resolve(__dirname, 'src')}],
+            entries: [
+                {find: '@girs/gnome-shell/ui/dash', replacement: 'resource:///org/gnome/shell/ui/dash.js'},
+                {find: '@', replacement: path.resolve(__dirname, 'src')},
+            ],
         }),
         nodeResolve({
             browser: false,

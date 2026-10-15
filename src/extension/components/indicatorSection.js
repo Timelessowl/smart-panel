@@ -5,8 +5,8 @@ import St from 'gi://St';
 import * as Main from '@girs/gnome-shell/ui/main';
 import * as PopupMenu from '@girs/gnome-shell/ui/popupMenu';
 
-import * as Constants from '@/constant.js';
-import {BaseSection} from '@/components/baseSection.js';
+import * as Constants from '@/extension/constants.js';
+import {BaseSection} from '@/extension/components/baseSection.js';
 
 export class IndicatorSection extends BaseSection {
     static {

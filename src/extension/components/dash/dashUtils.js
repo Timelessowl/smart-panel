@@ -38,6 +38,10 @@ export class DashActions {
             this.openNewWindow(entry.item.app);
     }
 
+    prepareLaunch(app) {
+        this._source.prepareLaunch(app, this._monitor);
+    }
+
     openNewWindow(app, monitor = this._monitor) {
         this._source.openNewWindow(app, monitor);
     }
@@ -67,11 +71,8 @@ export class DashLaunches {
             app.launch_action(action, global.get_current_time(), -1));
     }
 
-    _launch(app, monitor, launch) {
-        if (monitor === null) {
-            launch();
-            return;
-        }
+    prepareLaunch(app, monitor) {
+        if (monitor === null) return null;
         const request = {app, monitor, existing: new Set(app.get_windows()),
             window: null, connections: [], timeoutId: 0};
         request.timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 15000, () => {
@@ -80,10 +81,15 @@ export class DashLaunches {
             return GLib.SOURCE_REMOVE;
         });
         this._requests.add(request);
+        return request;
+    }
+
+    _launch(app, monitor, launch) {
+        const request = this.prepareLaunch(app, monitor);
         try {
             launch();
         } catch (error) {
-            this._finish(request);
+            if (request) this._finish(request);
             throw error;
         }
     }

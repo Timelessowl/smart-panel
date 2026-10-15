@@ -2,8 +2,8 @@ import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
 import * as Main from '@girs/gnome-shell/ui/main';
-import {BaseSection} from '@/components/baseSection.js';
-import * as DashLayout from '@/components/dash/dashLayout.js';
+import {BaseSection} from '@/extension/components/baseSection.js';
+import * as DashLayout from '@/extension/components/dash/dashLayout.js';
 
 // Owns the expanded surface, its transient registrations and their cleanup.
 // Token creation is shared with the collapsed dash through one callback.
@@ -26,8 +26,8 @@ export class ExpandedDash extends BaseSection {
         const layout = DashLayout.expandedLayout(entries, iconSize, availableWidth, scaleFactor);
         const grid = new St.Widget({layout_manager: new Clutter.FixedLayout(),
             width: layout.width, height: layout.height});
-        for (const {token, height, x, y} of layout.placements) {
-            const actor = createToken(token, height);
+        for (const {token, x, y} of layout.placements) {
+            const actor = createToken(token);
             actor.set_position(x, y);
             grid.add_child(actor);
         }
