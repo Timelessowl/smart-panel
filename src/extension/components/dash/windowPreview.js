@@ -27,6 +27,8 @@ export class WindowPreviewMenu extends PopupMenu.PopupMenu {
         this._openId = 0;
         this._closeId = 0;
         this._peekId = 0;
+        this._ensureVisibleId = 0;
+        this._titleHideId = 0;
         this._previewList = null;
         this._registration = null;
         this._hasChrome = false;
@@ -139,6 +141,13 @@ export class WindowPreviewMenu extends PopupMenu.PopupMenu {
         if (this.isOpen || !this._canOpen() || !this.getWindows().length) return;
         activePreview?.close();
         activePreview = this;
+        const area = Main.layoutManager.getWorkAreaForMonitor(this._owner._monitorIndex);
+        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        this.actor.set_style(
+            `min-width: 0px; ` +
+                `max-width: ${Math.round(area.width / scale) - Constants.WINDOW_PREVIEW_MARGIN}px; ` +
+                `max-height: ${Math.round(area.height / scale) - Constants.WINDOW_PREVIEW_MARGIN}px;`,
+        );
         Main.layoutManager.addTopChrome(this.actor, {
             affectsInputRegion: true,
             affectsStruts: false,
@@ -167,6 +176,7 @@ export class WindowPreviewMenu extends PopupMenu.PopupMenu {
     close(animate = BoxPointer.PopupAnimation.NONE) {
         this._cancelTimeout('_openId');
         this._cancelTimeout('_closeId');
+        this._cancelTimeout('_ensureVisibleId');
         this.endPeek();
         this.hideTitle();
         if (activePreview === this) activePreview = null;
@@ -189,12 +199,28 @@ export class WindowPreviewMenu extends PopupMenu.PopupMenu {
     requestPeek(item) {
         this._cancelTimeout('_peekId');
         if (!this.isOpen) return;
-        this._previewList.ensureVisible(item);
+        this.ensureVisible(item);
         this._peekId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, Constants.WINDOW_PREVIEW_PEEK_DELAY, () => {
             this._peekId = 0;
             if (this.isOpen && item.hover) this._peekWindow(item.window);
             return GLib.SOURCE_REMOVE;
         });
+    }
+
+    ensureVisible(item) {
+        this._cancelTimeout('_ensureVisibleId');
+        const adjustment = this._previewList._scroll.hadjustment;
+        if (adjustment.upper <= adjustment.page_size) return;
+        this._ensureVisibleId = GLib.timeout_add(
+            GLib.PRIORITY_DEFAULT,
+            Constants.WINDOW_PREVIEW_ENSURE_VISIBLE_DELAY,
+            () => {
+                this._ensureVisibleId = 0;
+                if (this.isOpen && this._previewList._items.get(item.window) === item)
+                    this._previewList.ensureVisible(item);
+                return GLib.SOURCE_REMOVE;
+            },
+        );
     }
 
     _peekWindow(window) {
@@ -293,7 +319,7 @@ export class WindowPreviewMenu extends PopupMenu.PopupMenu {
 
     showTitle(text) {
         this.hideTitle();
-        this._tooltip = new St.Label({style_class: 'dash-label', text, reactive: false});
+        this._tooltip = new St.Label({style_class: 'panel-tooltip', text, reactive: false});
         Main.layoutManager.addTopChrome(this._tooltip, {affectsInputRegion: false, affectsStruts: false});
         const [x, y] = global.get_pointer();
         const area = Main.layoutManager.getWorkAreaForMonitor(this._owner._monitorIndex);
@@ -307,8 +333,17 @@ export class WindowPreviewMenu extends PopupMenu.PopupMenu {
         );
     }
 
-    hideTitle() {
+    hideTitle(delay = 0) {
+        this._cancelTimeout('_titleHideId');
         if (!this._tooltip) return;
+        if (delay) {
+            this._titleHideId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
+                this._titleHideId = 0;
+                this.hideTitle();
+                return GLib.SOURCE_REMOVE;
+            });
+            return;
+        }
         Main.layoutManager.removeChrome(this._tooltip);
         this._tooltip.destroy();
         this._tooltip = null;
@@ -329,17 +364,18 @@ class WindowPreviewList extends PopupMenu.PopupMenuSection {
         this._menu = menu;
         this._items = new Map();
         this._destroyed = false;
-        this._scroll = new St.ScrollView({reactive: true, enable_mouse_scrolling: true, overlay_scrollbars: true});
-        this._scroll.set_policy(St.PolicyType.AUTOMATIC, St.PolicyType.NEVER);
+        this._scroll = new St.ScrollView({reactive: true, enable_mouse_scrolling: true});
+        this._scroll.set_policy(St.PolicyType.NEVER, St.PolicyType.NEVER);
         this.box.vertical = false;
-        this.box.set_style(`spacing: ${Constants.WINDOW_PREVIEW_SPACING}px;`);
+        this.box.reactive = true;
         if (this._scroll.set_child) this._scroll.set_child(this.box);
         else
             /** @type {St.ScrollView & {add_actor: (actor: St.BoxLayout) => void}} */ (this._scroll).add_actor(
                 this.box,
             );
-        this.actor = Object.assign(new St.BoxLayout(), {_delegate: this});
-        this.actor.add_child(this._scroll);
+        // Shell supports a ScrollView as the section actor, as in the reference.
+        // The generated declarations incorrectly restrict it to St.BoxLayout.
+        this.actor = /** @type {any} */ (Object.assign(this._scroll, {_delegate: this}));
         this._scroll.connect('scroll-event', (_actor, event) => this._onScroll(event));
         this.actor.connect('destroy', () => {
             this._destroyed = true;
@@ -353,21 +389,10 @@ class WindowPreviewList extends PopupMenu.PopupMenuSection {
         if (this._destroyed) return;
         const windows = this._menu.getWindows();
         for (const [window, item] of this._items) if (!windows.includes(window)) item.destroy();
-        const area = Main.layoutManager.getWorkAreaForMonitor(this._menu._owner._monitorIndex);
-        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
-        const maxWidth = Math.max(1, area.width - Constants.WINDOW_PREVIEW_MARGIN * 2 * scale);
-        const maxHeight = Math.max(1, area.height - Constants.WINDOW_PREVIEW_MARGIN * 2 * scale);
-        const padding = Constants.WINDOW_PREVIEW_PADDING * 2 * scale;
-        const width = Math.min(Constants.WINDOW_PREVIEW_MAX_WIDTH * scale, Math.max(1, maxWidth - padding));
-        const height = Math.min(
-            Constants.WINDOW_PREVIEW_MAX_HEIGHT * scale,
-            Math.max(1, maxHeight - padding - Constants.WINDOW_PREVIEW_HEADER_HEIGHT * scale),
-        );
-        this._scroll.set_style(`max-width: ${maxWidth / scale}px; max-height: ${maxHeight / scale}px;`);
         for (const [index, window] of windows.entries()) {
             let item = this._items.get(window);
             if (!item) {
-                item = new WindowPreviewMenuItem(window, this._menu, width, height);
+                item = new WindowPreviewMenuItem(window, this._menu);
                 this._items.set(window, item);
                 item.connect('destroy', () => {
                     this._menu.endPeek();
@@ -378,7 +403,23 @@ class WindowPreviewList extends PopupMenu.PopupMenuSection {
                 this.addMenuItem(item, index);
             } else this.moveMenuItem(item, index);
         }
+        this.box.queue_relayout();
+        this.updateScrollbar();
         if (!windows.length && this._menu.isOpen) this._menu.close();
+    }
+
+    updateScrollbar() {
+        // AUTOMATIC reserves scrollbar space even for a short list. Measure with
+        // both bars disabled, then enable the horizontal one only on overflow.
+        this._scroll.set_policy(St.PolicyType.NEVER, St.PolicyType.NEVER);
+        const actor = this._menu.actor;
+        if (!actor.get_stage()) return;
+        const [, naturalWidth] = actor.get_preferred_width(-1);
+        const maxWidth = actor.get_theme_node().get_max_width();
+        const needsScrollbar = maxWidth >= 0 && naturalWidth >= maxWidth;
+        this._scroll.set_policy(needsScrollbar ? St.PolicyType.AUTOMATIC : St.PolicyType.NEVER, St.PolicyType.NEVER);
+        if (needsScrollbar) this._scroll.add_style_pseudo_class('scrolled');
+        else this._scroll.remove_style_pseudo_class('scrolled');
     }
 
     ensureVisible(item) {
@@ -406,50 +447,73 @@ class WindowPreviewMenuItem extends PopupMenu.PopupBaseMenuItem {
         GObject.registerClass({GTypeName: 'SimpleBottomPanelWindowPreviewMenuItem'}, this);
     }
 
-    constructor(window, menu, width, height) {
+    constructor(window, menu) {
         super({hover: false});
         this.window = window;
         this._menu = menu;
-        this._maxWidth = width;
-        this._maxHeight = height;
         this._clone = null;
         this._cloneTextureLater = 0;
         this._windowAddedLater = 0;
         this._cloneAttempts = 0;
-        this.setOrnament(PopupMenu.Ornament.HIDDEN);
-        this.set_style(`padding: ${Constants.WINDOW_PREVIEW_PADDING}px;`);
+        // Hiding the ornament alone leaves the menu item's leading spacing.
+        // The photographed implementation removes it from the layout entirely.
+        const ornament = this.get_children()[0];
+        this.remove_child(ornament);
+        ornament.destroy();
+        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
         this._label = new St.Label({
             text: window.get_title() || menu._source.app.get_name(),
             y_align: Clutter.ActorAlign.CENTER,
         });
-        const title = new St.Bin({child: this._label, reactive: true, track_hover: true, x_expand: true});
+        this._label.set_style(`max-width: ${Constants.WINDOW_PREVIEW_MAX_WIDTH}px;`);
+        const title = new St.Bin({
+            child: this._label,
+            reactive: true,
+            track_hover: true,
+            x_expand: true,
+            x_align: Clutter.ActorAlign.START,
+        });
         this._closeButton = new St.Button({
             style_class: 'window-close',
             opacity: 0,
             can_focus: true,
             accessible_name: 'Close window',
-            child: new St.Icon({icon_name: 'window-close-symbolic', icon_size: 16}),
-            style: 'padding: 4px; min-width: 0; min-height: 0;',
+            x_align: Clutter.ActorAlign.END,
+            y_align: Clutter.ActorAlign.CENTER,
+            width: Math.round(Constants.WINDOW_PREVIEW_CLOSE_BUTTON_SIZE * scale),
+            height: Math.round(Constants.WINDOW_PREVIEW_CLOSE_BUTTON_SIZE * scale),
+            child: new St.Icon({
+                icon_name: 'window-close-symbolic',
+                icon_size: Math.round(Constants.WINDOW_PREVIEW_CLOSE_ICON_SIZE * scale),
+            }),
         });
         this._closeButton.connect('clicked', () => this._closeWindow());
         const header = new St.BoxLayout({
-            style: `spacing: 4px; min-height: ${Constants.WINDOW_PREVIEW_HEADER_HEIGHT}px;`,
+            height: Math.round(Constants.WINDOW_PREVIEW_TITLE_HEIGHT * scale),
+            style: `max-width: ${Constants.WINDOW_PREVIEW_MAX_WIDTH}px;`,
         });
         header.add_child(title);
         header.add_child(this._closeButton);
         this._cloneBin = new St.Bin({
-            width,
-            height,
             clip_to_allocation: true,
-            x_align: Clutter.ActorAlign.CENTER,
-            y_align: Clutter.ActorAlign.CENTER,
-            child: menu._source.app.create_icon_texture(48),
         });
-        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
-        const content = new St.BoxLayout({vertical: true, style: `spacing: 4px; width: ${width / scale}px;`});
-        content.add_child(header);
-        content.add_child(this._cloneBin);
-        this.add_child(content);
+        this._cloneBin.connect('notify::allocation', () => {
+            if (!this._clone) return;
+            const allocation = this._cloneBin.get_allocation_box();
+            this._clone.set_clip_to_allocation(true);
+            this._clone.set_size(allocation.get_width(), allocation.get_height());
+        });
+        const thumbnail = new Clutter.Actor({layout_manager: new Clutter.BinLayout(), y_expand: true, reactive: true});
+        thumbnail.add_child(this._cloneBin);
+        this._content = new St.BoxLayout({
+            vertical: true,
+            reactive: true,
+            x_expand: true,
+            style: `max-width: ${Constants.WINDOW_PREVIEW_MAX_WIDTH}px;`,
+        });
+        this._content.add_child(header);
+        this._content.add_child(thumbnail);
+        this.add_child(this._content);
         this.label_actor = this._label;
         window.connectObject(
             'notify::title',
@@ -462,22 +526,20 @@ class WindowPreviewMenuItem extends PopupMenu.PopupBaseMenuItem {
         window.connectObject('size-changed', () => this._queueTextureUpdate(), this);
         window.connectObject('unmanaged', () => this.destroy(), this);
         this.connect('notify::hover', () => {
-            if (this.hover) this.add_style_class_name('selected');
-            else this.remove_style_class_name('selected');
             this._syncCloseButton();
             if (this.hover) menu.requestPeek(this);
             else menu.endPeek();
         });
         this.connect('key-focus-in', () => {
             this._syncCloseButton();
-            menu._previewList.ensureVisible(this);
+            menu.ensureVisible(this);
         });
         this.connect('key-focus-out', () => this._syncCloseButton());
         this._closeButton.connect('key-focus-in', () => this._syncCloseButton());
         this._closeButton.connect('key-focus-out', () => this._syncCloseButton());
         title.connect('notify::hover', () => {
             if (title.hover && this._label.clutter_text.get_layout().is_ellipsized()) menu.showTitle(this._label.text);
-            else menu.hideTitle();
+            else menu.hideTitle(Constants.WINDOW_PREVIEW_TITLE_HIDE_DELAY);
         });
         this.connect('destroy', () => {
             if (this._cloneTextureLater) Utils.laterRemove(this._cloneTextureLater);
@@ -485,6 +547,27 @@ class WindowPreviewMenuItem extends PopupMenu.PopupBaseMenuItem {
             this._cloneTextureLater = this._windowAddedLater = 0;
         });
         if (!this._updateTexture()) this._queueTextureUpdate();
+    }
+
+    vfunc_style_changed() {
+        super.vfunc_style_changed();
+        this._updatePreferredSize();
+    }
+
+    _updatePreferredSize() {
+        // Match the reference's St padding workaround after the item is staged.
+        if (!this._content || !this.get_stage()) return;
+        const theme = this.get_theme_node();
+        let [minWidth, naturalWidth] = this._content.get_preferred_width(-1);
+        let [minHeight, naturalHeight] = this._content.get_preferred_height(naturalWidth);
+        [minWidth, naturalWidth] = theme.adjust_preferred_width(minWidth, naturalWidth);
+        [minHeight, naturalHeight] = theme.adjust_preferred_height(minHeight, naturalHeight);
+        this.set({
+            min_width: minWidth,
+            natural_width: naturalWidth,
+            min_height: minHeight,
+            natural_height: naturalHeight,
+        });
     }
 
     _syncCloseButton() {
@@ -561,8 +644,15 @@ class WindowPreviewMenuItem extends PopupMenu.PopupBaseMenuItem {
             actor.connectObject('notify::width', () => this._queueTextureUpdate(), this);
             actor.connectObject('notify::height', () => this._queueTextureUpdate(), this);
         }
-        const [previewWidth, previewHeight] = Utils.fitPreview(width, height, this._maxWidth, this._maxHeight);
+        const scale =
+            Math.min(1, Constants.WINDOW_PREVIEW_MAX_WIDTH / width, Constants.WINDOW_PREVIEW_MAX_HEIGHT / height) *
+            St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        const previewWidth = width * scale;
+        const previewHeight = height * scale;
+        this._cloneBin.set_size(previewWidth, previewHeight);
         this._clone.set_size(previewWidth, previewHeight);
+        this._updatePreferredSize();
+        this._menu._previewList?.updateScrollbar();
         return true;
     }
 
