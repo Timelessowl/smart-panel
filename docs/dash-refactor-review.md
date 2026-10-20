@@ -7,10 +7,13 @@ in `examples/gnome-shell`.
 
 - `dashUtils.js` exports only stateless helpers. Activation cycles belong to
   `DashSection`; pending monitor-specific launches belong to `DashSource`.
-- `NotificationsMonitor` is a registered GObject with typed signals. It observes
-  Shell's tray sources and notification urgency rather than subscribing to the
-  nonexistent D-Bus `Notify` signal. It aggregates multiple sources per desktop
-  ID and disconnects each source/notification exactly once.
+- `NotificationsMonitor` in `src/extension/notificationsMonitor.js` now follows
+  the user's supplied EventEmitter reference. It retains the state/merge model,
+  app-name resolution, D-Bus callbacks and count-based tray updates. Ordinary
+  module-local connection records replace GlobalSignalsHandler. Per-source
+  records prevent removing one source's handlers from disconnecting others.
+  The existing shared update signal, app-ID queries and DND state are retained
+  as integration adapters alongside the reference's per-app update signals.
 - `DashBadge` is a registered `St.Label`. Settings, monitor, desktop ID and
   container are explicit dependencies. Actor-bound connections handle native
   destruction. The existing capable-app list, opt-in setting, global switch,
@@ -56,8 +59,8 @@ retains expired source IDs or loses replaced/repeating timers.
 - `npm run build`: passes, including GSettings schema compilation.
 - `git diff --check`: passes.
 - Focused source, layout, notification, label, DND, native-popup, timer and panel
-  suites: **59 specs, zero failures**.
-- Full suite: **112 specs, 33 failures**, seed 79734. The starting workspace run
+  suites after the reference adaptation: **61 specs, zero failures**.
+- Last full-suite run before the reference adaptation: **112 specs, 33 failures**, seed 79734. The starting workspace run
   reported **97 specs, 50 failures**. Remaining failures are the older PanelMenu
   dash fixtures/missing API doubles, outdated frame/stylesheet assertions and
   the import audit's unavailable generated dash module. The harness now
@@ -75,3 +78,32 @@ The native implementations checked were `js/ui/messageTray.js`,
 `js/ui/boxpointer.js` and `js/misc/signalTracker.js` in the local Shell reference.
 See also [GObject basics](https://gjs.guide/guides/gobject/basics.html) and
 [GObject subclassing](https://gjs.guide/guides/gobject/subclassing.html).
+
+## Notification coverage comparison
+
+The earlier Shell-only monitor was replaced with the implementation shown in
+three user-supplied screenshots, with minimal integration changes:
+
+- Native Shell EventEmitter replaces the earlier registered GObject monitor,
+  matching the reference and supporting its dynamic per-app signal names.
+- `getState` accepts both the reference's Shell.App objects and existing badge
+  callers' desktop-ID strings. Both per-app and shared update signals are emitted.
+- Current DND handling stays in place. Logger calls use this project's static
+  logger, with parse errors reported through `console.error`.
+- Ordinary connections are held in a local array and a per-source Map, then
+  disconnected directly on removal/teardown. No GlobalSignalsHandler is used.
+- The reference's default fields, merge/change rules, app-name matching and
+  `notify::count` behavior are preserved. Source counts assign `trayCount` as in
+  the screenshots; this version does not aggregate counts across sources.
+
+The supplied D-Bus subscriptions and parsing are preserved, including the
+`Notify` subscription. Standard `org.freedesktop.Notifications.Notify` is a
+method whose second argument is `replaces_id`; subscribing to a signal with that
+name does not observe standard method calls. Tests exercise the supplied callback
+contract and cleanup using doubles, not actual D-Bus delivery on GNOME.
+
+[Dash to Panel's notificationsMonitor.js](https://github.com/home-sweet-gnome/dash-to-panel/blob/master/src/notificationsMonitor.js)
+uses the separate `com.canonical.Unity.LauncherEntry.Update` signal for
+app-reported badge counts. The supplied reference does not include that channel,
+and this adaptation does not add it. There is no claim of full LauncherEntry
+or app-unread-count equivalence.

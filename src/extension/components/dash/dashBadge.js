@@ -3,7 +3,7 @@ import GObject from 'gi://GObject';
 import St from 'gi://St';
 import * as PopupMenu from '@girs/gnome-shell/ui/popupMenu';
 import * as Constants from '@/extension/constants.js';
-import * as Notifications from '@/extension/common/notificationsMonitor.js';
+import * as Notifications from '@/extension/notificationsMonitor.js';
 
 const URGENT_STYLE_CLASS = 'dash-icon-urgent';
 

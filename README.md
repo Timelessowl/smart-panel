@@ -143,10 +143,14 @@ records the GNOME Shell 48.7 references and verification limits.
 
 Notification badges are native `St.Label` actors with settings and monitor
 dependencies supplied directly. They follow the configured app allowlist and
-Do Not Disturb. The GObject notification monitor observes Shell message-tray
-sources, aggregates sources by desktop ID, and follows urgency independently of
-count changes. One persistent, nonreactive `DashLabel` pointer per dash owns its
-show/reset timers and is destroyed with its section. Right-clicking an icon
+Do Not Disturb. `src/extension/notificationsMonitor.js` follows the supplied
+EventEmitter reference: per-app state merging, app-name resolution, D-Bus
+`Notify`/`NotificationClosed` subscriptions and Shell `notify::count` tracking.
+Connections are stored and disconnected directly inside the module. The
+existing badge API and DND handling remain compatible. The
+[coverage notes](docs/dash-refactor-review.md#notification-coverage-comparison)
+distinguish this reference from Unity LauncherEntry support. One persistent, nonreactive
+`DashLabel` pointer per dash owns its show/reset timers and is destroyed with its section. Right-clicking an icon
 while its preview holds a grab transfers that press to the native app menu.
 
 Preferences provide two toggles, both off by default:

@@ -2,7 +2,7 @@ import {Extension} from '@girs/gnome-shell/extensions/extension';
 
 import {MonitorManager} from '@/extension/monitorManager.js';
 import {DateMenuDecorator} from '@/extension/components/dateMenu.js';
-import {NotificationsMonitor} from '@/extension/common/notificationsMonitor.js';
+import {NotificationsMonitor} from '@/extension/notificationsMonitor.js';
 import * as IconStorage from '@/utils/iconStorage.js';
 import {DashSource} from '@/extension/components/dash/dashSource.js';
 import Logger from '@/utils/logger.js';
