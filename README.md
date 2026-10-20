@@ -167,7 +167,6 @@ All stub code has been removed. The former stub launcher opens dash preferences.
 `src/extension/` owns the runtime components, managers, constants, settings schema,
 and packaged assets. `src/utils/iconStorage.js` loads the Launchpad SVG through
 `Icons.LAUNCHPAD`, and `src/utils/logger.js` provides the shared debug logger.
-The photographed dash sources use these paths directly.
 
 The extension runtime needs no bundler or package manager. Rollup bundles the GJS
 modules and compiles Sass during development; GNOME imports and native APIs stay
@@ -219,7 +218,6 @@ the package's 45–49 list reproduces the supplied configuration.
 
 `npm run type:check` checks runtime JavaScript with `jsconfig.tsc.json`; no
 TypeScript output is installed. `npm run lint`, `npm run format:check`, and
-`npm run code:check` provide the photographed lint/format workflow; the matching
 fix commands edit the source. Runtime imports keep `@/` mapped to `src/`, native
 GI namespace imports, and `@girs/gnome-shell` re-exports.
 
@@ -238,10 +236,6 @@ projects, check metadata, preserved imports, compiled styles and schemas, and
 verify ZIP installation using a temporary stand-in for `gnome-extensions`.
 They require `glib-compile-schemas` and never change the desktop session.
 These tests do not establish native GNOME runtime acceptance.
-
-`npm run docs` generates API documentation in `docs/api/`. `npm run docs:serve`
-serves `docs/`, and `npm run docs:watch` runs the photographed JSDoc watch command.
-Generated build, test, ZIP and API documentation output is ignored by Git.
 
 ## Specifications
 

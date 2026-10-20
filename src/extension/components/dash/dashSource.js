@@ -8,7 +8,7 @@ import * as Constants from '@/extension/constants.js';
 
 const ALWAYS_PINNED_APPS = [
     Constants.APP_IDS.FILE_MANAGER,
-    Constants.APP_IDS.BROWSER,
+    Constants.APP_IDS.MAIL,
 ];
 
 export class DashSource extends GObject.Object {
@@ -29,10 +29,10 @@ export class DashSource extends GObject.Object {
         this._refreshId = 0;
         this._connect(this._appSystem, 'app-state-changed');
         this._connect(this._favorites, 'changed');
-        this._connect(this._tracker, 'tracked-windows-changed');
-        this._connect(global.display, 'window-created');
-        this._connect(global.display, 'window-entered-monitor');
-        this._connect(global.display, 'window-left-monitor');
+        if (this._settings.get_boolean(Constants.SettingsKeys.ISOLATE_TASKS)) {
+            this._connect(global.display, 'window-entered-monitor');
+            this._connect(global.display, 'window-left-monitor');
+        }
         this._connect(
             settings,
             `changed::${Constants.SettingsKeys.WINDOW_GROUPING}`
@@ -51,33 +51,20 @@ export class DashSource extends GObject.Object {
         ]);
     }
 
-    get perWindow() {
-        return this._state.perWindow;
-    }
-    get monitorOnly() {
-        return this._state.monitorOnly;
-    }
-
-    getFavorites() {
-        return [...this._state.favorites];
-    }
-    getRunningApps() {
-        return [...this._state.running];
-    }
-    getOpenedWindows() {
-        return [...this._state.windows];
-    }
-
+    get perWindow() { return this._state.perWindow; }
+    get settings() { return this._settings; }
+    get monitorOnly() { return this._state.monitorOnly; }
+    getFavorites() { return [...this._state.favorites]; }
+    getRunningApps() { return [...this._state.running]; }
+    getOpenedWindows() { return [...this._state.windows]; }
     getOpenMonitorWindows(monitor) {
         return this._state.windows.filter(
             window => window.get_monitor() === monitor
         );
     }
-
     getWindowApp(window) {
         return this._windows.get(window)?.app ?? null;
     }
-
     getAppWindows(app, monitor = null) {
         return this._state.windows.filter(
             window =>
@@ -85,9 +72,15 @@ export class DashSource extends GObject.Object {
                 (monitor === null || window.get_monitor() === monitor)
         );
     }
-
-    // Orders belong to the requesting dash; deriving its entries never changes
-    // shared state. Monitor scope is applied once, before grouping or counting.
+    getEntryWindows(entry, monitor = null) {
+        const windows = this.getAppWindows(
+            entry.item.app,
+            this.monitorOnly ? monitor : null
+        );
+        return entry.representedWindow
+            ? windows.filter(window => window === entry.representedWindow)
+            : windows;
+    }
     getEntries({monitor = null, favoriteOrder = [], runningOrder = []} = {}) {
         const windows = this.monitorOnly
             ? this.getOpenMonitorWindows(monitor)
@@ -250,13 +243,6 @@ export class DashSource extends GObject.Object {
                 let record = this._windows.get(window);
                 if (!record) {
                     record = {app, connections: []};
-                    this._connect(window, 'notify::title', record.connections);
-                    this._connect(
-                        window,
-                        'notify::skip-taskbar',
-                        record.connections
-                    );
-                    this._connect(window, 'unmanaged', record.connections);
                     this._windows.set(window, record);
                 }
                 record.app = app;
@@ -299,8 +285,13 @@ export class DashSource extends GObject.Object {
             running,
             windows,
             fixedIds,
-            perWindow: this._settings.get_boolean('group-open-windows'),
-            monitorOnly: this._settings.get_boolean('isolate-tasks'),
+            perWindow:
+                this._settings.get_int(
+                    Constants.SettingsKeys.WINDOW_GROUPING
+                ) === 1, // no proper const
+            monitorOnly: this._settings.get_boolean(
+                Constants.SettingsKeys.ISOLATE_TASKS
+            ),
         };
         this.emit('changed');
     }

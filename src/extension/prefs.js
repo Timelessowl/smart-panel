@@ -21,10 +21,19 @@ export default class SimpleBottomPanelPreferences extends ExtensionPreferences {
         });
         group.add(perWindow);
         group.add(monitorOnly);
-        settings.bind(Constants.SettingsKeys.WINDOW_GROUPING, perWindow, 'active', Gio.SettingsBindFlags.DEFAULT);
+        perWindow.active = settings.get_int(Constants.SettingsKeys.WINDOW_GROUPING) === 1;
+        const groupingChangedId = settings.connect(`changed::${Constants.SettingsKeys.WINDOW_GROUPING}`, () => {
+            perWindow.active = settings.get_int(Constants.SettingsKeys.WINDOW_GROUPING) === 1;
+        });
+        const perWindowChangedId = perWindow.connect('notify::active', () => {
+            const mode = perWindow.active ? 1 : 0;
+            if (settings.get_int(Constants.SettingsKeys.WINDOW_GROUPING) !== mode)
+                settings.set_int(Constants.SettingsKeys.WINDOW_GROUPING, mode);
+        });
         settings.bind(Constants.SettingsKeys.ISOLATE_TASKS, monitorOnly, 'active', Gio.SettingsBindFlags.DEFAULT);
         window.connect('close-request', () => {
-            Gio.Settings.unbind(perWindow, 'active');
+            settings.disconnect(groupingChangedId);
+            perWindow.disconnect(perWindowChangedId);
             Gio.Settings.unbind(monitorOnly, 'active');
             return false;
         });

@@ -1,0 +1,77 @@
+@use 'sass:map';
+@use 'variables' as *;
+@use 'colors' as c;
+
+.bottom-panel-surface {
+    background-color: transparent;
+}
+
+.panel-section-content {
+    border: 1px solid transparent;
+    border-radius: $panel-radius;
+}
+
+.panel-section {
+    border: $section-border;
+    border-radius: $section-border-radius;
+    box-shadow: inset 0 1px 1px 0 c.$panel-section-inner-shade-color;
+}
+
+.system-section {
+    padding: $sys-sec-padding;
+    spacing: $sys-sec-spacing;
+}
+
+@each $theme, $palette in c.$palettes {
+    .bottom-panel-surface.#{$theme} {
+        .dash-window-dot {
+            background-color: map.get($palette, dot);
+        }
+        .panel-section-content {
+            background-color: map.get($palette, section-content-bg);
+            border-color: map.get($palette, section-content-border);
+        }
+
+        .panel-section-frame {
+            background-color: map.get($palette, section-content-bg);
+            border-color: map.get($palette, section-border);
+        }
+
+        .panel-section {
+            background-color: map.get($palette, section-bg);
+            border-color: map.get($palette, section-border);
+        }
+
+        .system-section,
+        .indicator-section,
+        .dash-placeholder {
+            color: map.get($palette, text);
+        }
+
+        // Menu button states
+        .debian-button:hover,
+        .debian-button:focus,
+        .debian-button:active,
+        .debian-button:checked {
+            background-color: map.get($palette, active-bg);
+            border-color: map.get($palette, active-border);
+            box-shadow: none;
+        }
+
+        .dash-app-button:hover,
+        .system-section-button:hover,
+        .indicator-button:hover {
+            background-color: map.get($palette, hover-bg);
+        }
+
+        .dash-overflow-button {
+            background-color: transparent;
+        }
+
+        .search-entry {
+            StLabel.hint-text {
+                color: map.get($palette, search-hint);
+            }
+        }
+    }
+}

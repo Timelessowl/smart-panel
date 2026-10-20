@@ -16,23 +16,44 @@ import * as PopupMenu from '@girs/gnome-shell/ui/popupMenu';
 
 import * as Constants from '@/extension/constants.js';
 import * as Utils from '@/utils/utils.js';
+import TimeoutManager from '@/utils/timeoutHelper.js';
 
 let activePreview = null;
+
+/**
+ * @typedef {Object} Timeout
+ * @property {string} label - string name of the timeout
+ * @property {int} timeout
+ */
+const Timeouts = Object.freeze({
+    OPEN: {label: 'openTimeout', timeout: Constants.WINDOW_PREVIEW_OPEN_DELAY},
+    CLOSE: {
+        label: 'closeTimeout',
+        timeout: Constants.WINDOW_PREVIEW_CLOSE_DELAY,
+    },
+    PEEK: {
+        label: 'peekTimeout',
+        timeout: Constants.WINDOW_PREVIEW_PEEK_DELAY,
+    },
+    ENSURE_VISIBLE: {
+        label: 'ensureVisibleTimeout',
+        timeout: Constants.WINDOW_PREVIEW_ENSURE_VISIBLE_DELAY,
+    },
+    HIDE_TITLE: {
+        label: 'hideTitleTimeout',
+        timeout: Constants.WINDOW_PREVIEW_TITLE_HIDE_DELAY,
+    },
+});
 
 export class WindowPreviewMenu extends PopupMenu.PopupMenu {
     constructor(source, owner) {
         super(source, 0.5, St.Side.BOTTOM);
         this._source = source;
         this._owner = owner;
-        this._openId = 0;
-        this._closeId = 0;
-        this._peekId = 0;
-        this._ensureVisibleId = 0;
-        this._titleHideId = 0;
+        this._timeoutManager = new TimeoutManager();
         this._previewList = null;
         this._registration = null;
         this._hasChrome = false;
-        this._destroyed = false;
         this._dragInProgress = false;
         this._tooltip = null;
         this._peekedWindow = null;
@@ -62,7 +83,7 @@ export class WindowPreviewMenu extends PopupMenu.PopupMenu {
             this.actor,
         );
         this.actor.connect('enter-event', () => {
-            this._cancelTimeout('_closeId');
+            this._timeoutManager.clearTimeout(Timeouts.CLOSE.label);
             return Clutter.EVENT_PROPAGATE;
         });
         this.actor.connect('leave-event', (_actor, event) => {
@@ -77,26 +98,16 @@ export class WindowPreviewMenu extends PopupMenu.PopupMenu {
         });
     }
 
+    // Only the list order is a preview concern; the entry scope comes from the
+    // dash source so every consumer agrees on the represented windows.
     getWindows() {
-        const source = this._owner._source;
-        return source
-            .getAppWindows(this._source.app, source.monitorOnly ? this._owner._monitorIndex : null)
-            .filter(
-                (window) =>
-                    !window.skip_taskbar &&
-                    (!this._source.entry.representedWindow || window === this._source.entry.representedWindow),
-            )
+        return this._owner._source
+            .getEntryWindows(this._source.entry, this._owner._monitorIndex)
             .sort((a, b) => b.get_user_time() - a.get_user_time());
-    }
-
-    _cancelTimeout(property) {
-        if (this[property]) GLib.source_remove(this[property]);
-        this[property] = 0;
     }
 
     _canOpen() {
         return (
-            !this._destroyed &&
             !this._dragInProgress &&
             this._source.mapped &&
             !this._source.dragging &&
@@ -110,20 +121,20 @@ export class WindowPreviewMenu extends PopupMenu.PopupMenu {
     }
 
     scheduleOpen() {
-        this._cancelTimeout('_closeId');
-        if (this.isOpen || this._openId || !this._canOpen()) return;
-        this._openId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, Constants.WINDOW_PREVIEW_OPEN_DELAY, () => {
-            this._openId = 0;
+        this._timeoutManager.clearTimeout(Timeouts.CLOSE.label);
+        if (this.isOpen || this._timeoutManager.hasActiveTimeout(Timeouts.OPEN.label) || !this._canOpen()) return;
+        this._timeoutManager.addTimeout(Timeouts.OPEN.label, Timeouts.OPEN.timeout, () => {
+            this._timeoutManager.clearTimeout(Timeouts.OPEN.label);
             if (this._source.hover) this.open();
             return GLib.SOURCE_REMOVE;
         });
     }
 
     scheduleClose() {
-        this._cancelTimeout('_openId');
-        this._cancelTimeout('_closeId');
-        this._closeId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, Constants.WINDOW_PREVIEW_CLOSE_DELAY, () => {
-            this._closeId = 0;
+        this._timeoutManager.clearTimeout(Timeouts.OPEN.label);
+        this._timeoutManager.clearTimeout(Timeouts.CLOSE.label);
+        this._timeoutManager.addTimeout(Timeouts.CLOSE.label, Timeouts.CLOSE.timeout, () => {
+            this._timeoutManager.clearTimeout(Timeouts.CLOSE.label);
             this.close();
             return GLib.SOURCE_REMOVE;
         });
@@ -135,8 +146,8 @@ export class WindowPreviewMenu extends PopupMenu.PopupMenu {
     }
 
     open(animate = BoxPointer.PopupAnimation.FULL) {
-        this._cancelTimeout('_openId');
-        this._cancelTimeout('_closeId');
+        this._timeoutManager.clearTimeout(Timeouts.OPEN.label);
+        this._timeoutManager.clearTimeout(Timeouts.CLOSE.label);
         if (this.isOpen || !this._canOpen() || !this.getWindows().length) return;
         activePreview?.close();
         activePreview = this;
@@ -161,21 +172,20 @@ export class WindowPreviewMenu extends PopupMenu.PopupMenu {
             this.close();
             return;
         }
-        // A hover popup has no modal grab, so the pointer can move between icons.
+
         this._owner.menuChanged(this.actor, true);
         this._registration = this._owner._transientInputManager.register(
             this.actor,
             () => this.close(),
             new Set([this._source]),
         );
-        this._source.setForcedHighlight(true);
         this._source.emit('sync-tooltip');
     }
 
     close(animate = BoxPointer.PopupAnimation.NONE) {
-        this._cancelTimeout('_openId');
-        this._cancelTimeout('_closeId');
-        this._cancelTimeout('_ensureVisibleId');
+        this._timeoutManager.clearTimeout(Timeouts.OPEN.label);
+        this._timeoutManager.clearTimeout(Timeouts.CLOSE.label);
+        this._timeoutManager.clearTimeout(Timeouts.ENSURE_VISIBLE.label);
         this.endPeek();
         this.hideTitle();
         if (activePreview === this) activePreview = null;
@@ -196,37 +206,32 @@ export class WindowPreviewMenu extends PopupMenu.PopupMenu {
     }
 
     requestPeek(item) {
-        this._cancelTimeout('_peekId');
+        this._timeoutManager.clearTimeout(Timeouts.PEEK.label);
         if (!this.isOpen) return;
         this.ensureVisible(item);
-        this._peekId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, Constants.WINDOW_PREVIEW_PEEK_DELAY, () => {
-            this._peekId = 0;
+        this._timeoutManager.addTimeout(Timeouts.PEEK.label, Timeouts.PEEK.timeout, () => {
+            this._timeoutManager.clearTimeout(Timeouts.PEEK.label);
             if (this.isOpen && item.hover) this._peekWindow(item.window);
             return GLib.SOURCE_REMOVE;
         });
     }
 
     ensureVisible(item) {
-        this._cancelTimeout('_ensureVisibleId');
+        this._timeoutManager.clearTimeout(Timeouts.ENSURE_VISIBLE.label);
         const adjustment = this._previewList._scroll.hadjustment;
         if (adjustment.upper <= adjustment.page_size) return;
-        this._ensureVisibleId = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT,
-            Constants.WINDOW_PREVIEW_ENSURE_VISIBLE_DELAY,
-            () => {
-                this._ensureVisibleId = 0;
-                if (this.isOpen && this._previewList._items.get(item.window) === item)
-                    this._previewList.ensureVisible(item);
-                return GLib.SOURCE_REMOVE;
-            },
-        );
+        this._timeoutManager.addTimeout(Timeouts.ENSURE_VISIBLE.label, Timeouts.ENSURE_VISIBLE.timeout, () => {
+            this._timeoutManager.clearTimeout(Timeouts.ENSURE_VISIBLE.label);
+            if (this.isOpen && this._previewList._items.get(item.window) === item)
+                this._previewList.ensureVisible(item);
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     _peekWindow(window) {
         if (this._peekedWindow === window) return;
         this.endPeek();
         const workspace = window.get_workspace();
-        if (!window.get_compositor_private() || !workspace) return;
         this._peekedWindow = window;
         this._initialWorkspace = global.workspace_manager.get_active_workspace();
         this._peekWorkspace = window.is_on_all_workspaces() ? this._initialWorkspace : workspace;
@@ -265,7 +270,7 @@ export class WindowPreviewMenu extends PopupMenu.PopupMenu {
     }
 
     endPeek(stayHere = false) {
-        this._cancelTimeout('_peekId');
+        this._timeoutManager.clearTimeout(Timeouts.PEEK.label);
         if (!this._peekedWindow) return;
         const actors = [...this._peekActors].sort((a, b) => a[1].index - b[1].index);
         for (const [actor, state] of actors) {
@@ -318,8 +323,15 @@ export class WindowPreviewMenu extends PopupMenu.PopupMenu {
 
     showTitle(text) {
         this.hideTitle();
-        this._tooltip = new St.Label({style_class: 'panel-tooltip', text, reactive: false});
-        Main.layoutManager.addTopChrome(this._tooltip, {affectsInputRegion: false, affectsStruts: false});
+        this._tooltip = new St.Label({
+            style_class: 'panel-tooltip',
+            text,
+            reactive: false,
+        });
+        Main.layoutManager.addTopChrome(this._tooltip, {
+            affectsInputRegion: false,
+            affectsStruts: false,
+        });
         const [x, y] = global.get_pointer();
         const area = Main.layoutManager.getWorkAreaForMonitor(this._owner._monitorIndex);
         const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
@@ -333,11 +345,11 @@ export class WindowPreviewMenu extends PopupMenu.PopupMenu {
     }
 
     hideTitle(delay = 0) {
-        this._cancelTimeout('_titleHideId');
+        this._timeoutManager.clearTimeout(Timeouts.HIDE_TITLE.label);
         if (!this._tooltip) return;
         if (delay) {
-            this._titleHideId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
-                this._titleHideId = 0;
+            this._timeoutManager.addTimeout(Timeouts.HIDE_TITLE.label, delay, () => {
+                this._timeoutManager.clearTimeout(Timeouts.HIDE_TITLE.label);
                 this.hideTitle();
                 return GLib.SOURCE_REMOVE;
             });
@@ -349,11 +361,9 @@ export class WindowPreviewMenu extends PopupMenu.PopupMenu {
     }
 
     destroy() {
-        if (this._destroyed) return;
         this.close();
-        this._destroyed = true;
+        this._timeoutManager?.destroy();
         super.destroy();
-        this._owner = null;
     }
 }
 
@@ -362,30 +372,23 @@ class WindowPreviewList extends PopupMenu.PopupMenuSection {
         super();
         this._menu = menu;
         this._items = new Map();
-        this._destroyed = false;
-        this._scroll = new St.ScrollView({reactive: true, enable_mouse_scrolling: true});
-        this._scroll.set_policy(St.PolicyType.NEVER, St.PolicyType.NEVER);
-        this.box.vertical = false;
-        this.box.reactive = true;
-        if (this._scroll.set_child) this._scroll.set_child(this.box);
-        else
-            /** @type {St.ScrollView & {add_actor: (actor: St.BoxLayout) => void}} */ (this._scroll).add_actor(
-                this.box,
-            );
-        // Shell supports a ScrollView as the section actor, as in the reference.
-        // The generated declarations incorrectly restrict it to St.BoxLayout.
-        this.actor = /** @type {any} */ (Object.assign(this._scroll, {_delegate: this}));
-        this._scroll.connect('scroll-event', (_actor, event) => this._onScroll(event));
-        this.actor.connect('destroy', () => {
-            this._destroyed = true;
+        this._scroll = new St.ScrollView({
+            reactive: true,
+            enable_mouse_scrolling: true,
         });
+        this._scroll.set_policy(St.PolicyType.NEVER, St.PolicyType.NEVER);
+        this.box.set_vertical(false);
+        this.box.reactive = true;
+        this._scroll.set_child(this.box);
+        this._scroll._delegate = this;
+        this.actor = this._scroll;
+        this._scroll.connect('scroll-event', (_actor, event) => this._onScroll(event));
         // Shell cancels deferred work automatically when its actor is destroyed.
         this._redisplayId = Main.initializeDeferredWork(this.actor, () => this.redisplay());
         menu._source.app.connectObject('windows-changed', () => Main.queueDeferredWork(this._redisplayId), this.actor);
     }
 
     redisplay() {
-        if (this._destroyed) return;
         const windows = this._menu.getWindows();
         for (const [window, item] of this._items) if (!windows.includes(window)) item.destroy();
         for (const [index, window] of windows.entries()) {
@@ -454,8 +457,6 @@ class WindowPreviewMenuItem extends PopupMenu.PopupBaseMenuItem {
         this._cloneTextureLater = 0;
         this._windowAddedLater = 0;
         this._cloneAttempts = 0;
-        // Hiding the ornament alone leaves the menu item's leading spacing.
-        // The photographed implementation removes it from the layout entirely.
         const ornament = this.get_children()[0];
         this.remove_child(ornament);
         ornament.destroy();
@@ -502,7 +503,11 @@ class WindowPreviewMenuItem extends PopupMenu.PopupBaseMenuItem {
             this._clone.set_clip_to_allocation(true);
             this._clone.set_size(allocation.get_width(), allocation.get_height());
         });
-        const thumbnail = new Clutter.Actor({layout_manager: new Clutter.BinLayout(), y_expand: true, reactive: true});
+        const thumbnail = new Clutter.Actor({
+            layout_manager: new Clutter.BinLayout(),
+            y_expand: true,
+            reactive: true,
+        });
         thumbnail.add_child(this._cloneBin);
         this._content = new St.BoxLayout({
             vertical: true,

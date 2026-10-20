@@ -5,9 +5,10 @@ import {ThemeManager} from '@/extension/themeManager.js';
 import {TransientInputManager} from '@/extension/transientInputManager.js';
 
 export class MonitorManager {
-    constructor({dashSource, indicators, openPreferences}) {
+    constructor({dashSource, notificationsMonitor, indicators, openPreferences}) {
         this._panels = [];
         this._dashSource = dashSource;
+        this._notificationsMonitor = notificationsMonitor;
         this._indicators = indicators;
         this._openPreferences = openPreferences;
         this._themeManager = new ThemeManager();
@@ -25,6 +26,7 @@ export class MonitorManager {
         for (const monitor of Main.layoutManager.monitors) {
             const panel = new BottomPanel(monitor, {
                 dashSource: this._dashSource,
+                notificationsMonitor: this._notificationsMonitor,
                 indicators: this._indicators,
                 openPreferences: this._openPreferences,
                 themeManager: this._themeManager,

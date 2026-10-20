@@ -1,0 +1,79 @@
+@use "sass:map";
+
+$palettes: (
+    dark: (
+        section-content-bg:     rgba(43, 49, 58, 0.88),
+        section-content-border: rgba(white, 0.08),
+        section-border:         rgba(white, 0.16),
+        section-bg:             rgba(31, 35, 43, 0.4),
+        hover-bg:               rgb(56, 56, 62),
+        active-bg:              rgb(40, 40, 46),
+        active-border:          rgba(white, 0.16),
+        text:                   white,
+        search-hint:            rgb(175, 179, 192),
+        separator:              rgb(100, 100, 108),
+        dot:                    white,
+        tooltip-bg:             rgba(31, 35, 43, 0.96),
+
+        // Date menu
+        calendar-card-bg:               rgba(43, 49, 58, 0.88),
+        calendar-card-border:           1px solid rgba(white, 0.08),
+        calendar-header-icon:           white,
+        calendar-heading:               rgb(175, 179, 192),
+        calendar-day-hover:             rgb(39, 41, 48),
+        calendar-focus-ring:            rgba(white, 0.2),
+        calendar-selected-bg:           #f4f5f7,
+        calendar-selected-text:         #272930,
+        calendar-other-month:           rgb(92, 97, 112),
+        calendar-week-num:              rgb(175, 179, 192),
+        calendar-week-num-bg:           rgba(175, 179, 192, 0.15),
+        calendar-event-bg:              rgba(white, 0.04),
+        calendar-event-hover-bg:        rgba(white, 0.08),
+        calendar-event-subtext:         rgb(175, 179, 192),
+        calendar-message-border:        rgba(white, 0.08),
+        calendar-message-bg:            rgba(43, 49, 58, 0.88),
+        calendar-message-item-bg:       rgba(white, 0.06),
+        calendar-message-placeholder:   rgba(white, 0.45),
+    ),
+    light: (
+        section-content-bg:     rgba(white, 0.92),
+        section-content-border: rgba(white, 0.42),
+        section-border:         rgba(white, 0.32),
+        section-bg:             rgba(247, 249, 251, 0.72),
+        hover-bg:               rgb(226, 226, 230),
+        active-bg:              rgb(228, 228, 232),
+        active-border:          rgba(white, 0.32),
+        text:                   rgba(43, 49, 58, 0.88),
+        search-hint:            rgb(126, 126, 132),
+        separator:              rgb(172, 172, 180),
+        dot:                    rgb(36, 36, 40),
+        tooltip-bg:             rgba(255, 255, 255, 0.96),
+
+        // Date menu
+        calendar-card-bg:               rgb(255, 255, 255),
+        calendar-card-border:           null,
+        calendar-header-icon:           rgb(92, 97, 112),
+        calendar-heading:               rgb(147, 152, 169),
+        calendar-day-hover:             rgba(37, 53, 101, 0.08),
+        calendar-focus-ring:            rgba(0, 0, 0, 0.2),
+        calendar-selected-bg:           #32353e,
+        calendar-selected-text:         white,
+        calendar-other-month:           rgb(147, 152, 169),
+        calendar-week-num:              rgba(43, 49, 58, 0.88),
+        calendar-week-num-bg:           rgba(39, 41, 48, 0.07),
+        calendar-event-bg:              rgba(0, 0, 0, 0.04),
+        calendar-event-hover-bg:        rgba(0, 0, 0, 0.06),
+        calendar-event-subtext:         rgb(92, 97, 112),
+        calendar-message-border:        rgba(0, 0, 0, 0.15),
+        calendar-message-bg:            rgba(white, 0.9),
+        calendar-message-item-bg:       rgba(0, 0, 0, 0.06),
+        calendar-message-placeholder:   rgba(43, 49, 58, 0.396),
+    ),
+);
+
+$panel-section-inner-shade-color: rgba(white, 0.45);
+
+$calendar-hover-outline: rgb(217, 220, 227);
+$calendar-today-accent: rgb(235, 51, 68);
+$calendar-dnd-checked-bg: rgba(72, 133, 240, 0.2);
+$calendar-dnd-checked-border: rgba(72, 133, 240, 0.4);

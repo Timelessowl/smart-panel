@@ -15,3 +15,5 @@ export function getIcon(name) {
     }
     return icons.get(name);
 }
+
+export function init() {}

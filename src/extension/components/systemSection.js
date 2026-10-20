@@ -9,11 +9,13 @@ import {BaseSection} from '@/extension/components/baseSection.js';
 
 export class SystemSection extends BaseSection {
     static {
-        GObject.registerClass(this);
+        GObject.registerClass({Signals: {'geometry-changed': {}}}, this);
     }
 
     constructor() {
         super();
+        // Stub width: the updated system section was not supplied.
+        this.preferredWidth = 236;
 
         const content = new St.BoxLayout({
             style_class: 'system-section',

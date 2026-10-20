@@ -5,56 +5,109 @@ export function scaleDimension(value, scale = 1) {
 }
 
 export function sectionWidth(contentWidth, scale = 1) {
-    return contentWidth + 2 * scaleDimension(Constants.DASH_PADDING, scale) +
+    return (
+        contentWidth +
+        2 * scaleDimension(Constants.DASH_PADDING, scale) +
         2 * scaleDimension(Constants.SECTION_FRAME_WIDTH, scale) +
-        2 * scaleDimension(Constants.SECTION_CONTENT_BORDER_WIDTH, scale);
+        2 * scaleDimension(Constants.SECTION_CONTENT_BORDER_WIDTH, scale) +
+        2 * scaleDimension(Constants.SECTION_BORDER_WIDTH, scale)
+    );
 }
 
 function tokensFor(entries, count, iconSize, hiddenCount = 0) {
-    const tokens = [{type: 'launchpad', width: iconSize}];
+    const tokens = [{type: Constants.DashTokenType.LAUNCHPAD, width: iconSize}];
     let hasSeparator = false;
     for (const entry of entries.slice(0, count)) {
         if (entry.group === 'running' && !hasSeparator) {
-            tokens.push({type: 'separator', width: Constants.DASH_SEPARATOR_WIDTH});
+            tokens.push({
+                type: Constants.DashTokenType.SEPARATOR,
+                width: Constants.DASH_SEPARATOR_WIDTH,
+            });
             hasSeparator = true;
         }
-        tokens.push({type: 'icon', entry, width: iconSize});
+        tokens.push({
+            type: Constants.DashTokenType.DASH_ICON,
+            entry,
+            width: iconSize,
+        });
     }
     if (hiddenCount) {
         if (entries[count]?.group === 'running' && !hasSeparator)
-            tokens.push({type: 'separator', width: Constants.DASH_SEPARATOR_WIDTH});
-        tokens.push({type: 'overflow', hiddenCount, width: iconSize});
+            tokens.push({
+                type: Constants.DashTokenType.SEPARATOR,
+                width: Constants.DASH_SEPARATOR_WIDTH,
+            });
+        tokens.push({
+            type: Constants.DashTokenType.OVERFLOW,
+            hiddenCount,
+            width: iconSize,
+        });
     }
     return tokens;
 }
 
 export function tokensWidth(tokens, scale = 1) {
-    return tokens.reduce((sum, token) => sum + Math.round(token.width * scale), 0) +
-        Math.max(0, tokens.length - 1) * Math.round(Constants.DASH_ITEM_SPACING * scale);
+    return (
+        tokens.reduce(
+            (sum, token) => sum + Math.round(token.width * scale),
+            0
+        ) +
+        Math.max(0, tokens.length - 1) *
+            Math.round(Constants.DASH_ITEM_SPACING * scale)
+    );
 }
 
-// All dimensions are in stage coordinates. Icons use logical pixel sizes.
 export function layoutDash(entries, availableWidth, scale = 1) {
     const usableWidth = Math.max(0, availableWidth - sectionWidth(0, scale));
-    for (const iconSize of [Constants.DASH_ICON_SIZE, Constants.DASH_SMALL_ICON_SIZE]) {
+    for (const iconSize of [
+        Constants.DASH_ICON_SIZE,
+        Constants.DASH_SMALL_ICON_SIZE,
+    ]) {
         const tokens = tokensFor(entries, entries.length, iconSize);
         if (tokensWidth(tokens, scale) <= usableWidth)
-            return {iconSize, tokens, hiddenCount: 0,
-                width: sectionWidth(tokensWidth(tokens, scale), scale)};
+            return {
+                iconSize,
+                tokens,
+                hiddenCount: 0,
+                width: sectionWidth(tokensWidth(tokens, scale), scale),
+            };
     }
 
     for (let count = entries.length - 1; count >= 0; count--) {
         const hiddenCount = entries.length - count;
-        const tokens = tokensFor(entries, count, Constants.DASH_SMALL_ICON_SIZE, hiddenCount);
+        const tokens = tokensFor(
+            entries,
+            count,
+            Constants.DASH_SMALL_ICON_SIZE,
+            hiddenCount
+        );
         if (tokensWidth(tokens, scale) <= usableWidth)
-            return {iconSize: Constants.DASH_SMALL_ICON_SIZE, tokens, hiddenCount,
-                width: sectionWidth(tokensWidth(tokens, scale), scale)};
+            return {
+                iconSize: Constants.DASH_SMALL_ICON_SIZE,
+                tokens,
+                hiddenCount,
+                width: sectionWidth(tokensWidth(tokens, scale), scale),
+            };
     }
 
-    // On exceptionally narrow monitors, clip rather than crossing into search.
-    const tokens = tokensFor(entries, 0, Constants.DASH_SMALL_ICON_SIZE, entries.length);
-    return {iconSize: Constants.DASH_SMALL_ICON_SIZE, tokens, hiddenCount: entries.length,
-        width: Math.max(0, Math.min(availableWidth, sectionWidth(tokensWidth(tokens, scale), scale)))};
+    const tokens = tokensFor(
+        entries,
+        0,
+        Constants.DASH_SMALL_ICON_SIZE,
+        entries.length
+    );
+    return {
+        iconSize: Constants.DASH_SMALL_ICON_SIZE,
+        tokens,
+        hiddenCount: entries.length,
+        width: Math.max(
+            0,
+            Math.min(
+                availableWidth,
+                sectionWidth(tokensWidth(tokens, scale), scale)
+            )
+        ),
+    };
 }
 
 export function expandedRows(entries, iconSize, usableWidth, scale = 1) {
@@ -62,35 +115,44 @@ export function expandedRows(entries, iconSize, usableWidth, scale = 1) {
     const rows = [[]];
     const spacing = Math.round(Constants.DASH_ITEM_SPACING * scale);
     let width = 0;
-    for (let index = 0; index < tokens.length; index++) {
-        const token = tokens[index];
+    tokens.forEach(token => {
+        if (token.type === Constants.DashTokenType.SEPARATOR) return;
         const tokenWidth = Math.round(token.width * scale);
-        // Keep the running separator with its first icon, not at a row's end.
-        const required = tokenWidth + (token.type === 'separator'
-            ? spacing + Math.round(tokens[index + 1].width * scale) : 0);
-        if (width && width + spacing + required > usableWidth) {
+        if (width && width + spacing + tokenWidth > usableWidth) {
             rows.push([]);
             width = 0;
         }
         rows.at(-1).push(token);
         width += (width ? spacing : 0) + tokenWidth;
-    }
+    });
     return rows;
 }
 
 export function expandedLayout(entries, iconSize, availableWidth, scale = 1) {
-    const rows = expandedRows(entries, iconSize, Math.max(0, availableWidth - sectionWidth(0, scale)), scale);
-    const height = scaleDimension(Constants.DASH_EXPANDED_ROW_HEIGHT, scale);
+    const rows = expandedRows(
+        entries,
+        iconSize,
+        Math.max(0, availableWidth - sectionWidth(0, scale)),
+        scale
+    );
+    const height = scaleDimension(Constants.DASH_ICON_SIZE, scale);
     const spacing = scaleDimension(Constants.DASH_ITEM_SPACING, scale);
     const placements = [];
     rows.forEach((row, rowIndex) => {
         let x = 0;
         for (const token of row) {
-            placements.push({token, height, x, y: rowIndex * (height + spacing) +
-                (token.type === 'separator' ? (height - scaleDimension(iconSize, scale)) / 2 : 0)});
+            placements.push({
+                token,
+                height,
+                x,
+                y: rowIndex * (height + spacing),
+            });
             x += scaleDimension(token.width, scale) + spacing;
         }
     });
-    return {placements, width: Math.max(...rows.map(row => tokensWidth(row, scale))),
-        height: rows.length * height + (rows.length - 1) * spacing};
+    return {
+        placements,
+        width: Math.max(...rows.map(row => tokensWidth(row, scale))),
+        height: rows.length * height + (rows.length - 1) * spacing,
+    };
 }

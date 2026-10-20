@@ -1,0 +1,73 @@
+@use 'sass:map';
+@use 'variables' as *;
+@use 'colors' as c;
+
+.dash-app-button,
+.dash-app-button:hover,
+.dash-app-button:active,
+.dash-app-button:focus {
+    background-color: transparent;
+    border: none;
+    border-radius: 6px;
+    box-shadow: none;
+    font-weight: 600;
+    padding: 0;
+    -minimum-hpadding: 0;
+    -natural-hpadding: 0;
+}
+
+.dash-window-dots {
+    spacing: 4px;
+    min-height: 6px;
+}
+
+.dash-window-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 2px;
+}
+
+.dash-drop-preview {
+    background-color: transparent;
+    border: none;
+    padding: 0;
+}
+
+.dash-notification-badge {
+    font-weight: $fw-600;
+    color: white;
+    background-color: $notification-red;
+}
+
+.dash-icon-urgent {
+    box-shadow: 0 0 0 2px $notification-red;
+}
+
+.smart-panel-dash-label {
+    -arrow-rise: 8px;
+    -arrow-base: 16px;
+    -arrow-border-width: 0px;
+    -arrow-border-radius: $radius-md;
+}
+
+.smart-panel-dash-label-text {
+    padding: $spacing-6 $radius-md;
+}
+
+@each $theme, $palette in c.$palettes {
+    .bottom-panel-surface.#{$theme} {
+        .dash-running-separator {
+            background-color: map.get($palette, dot);
+            border-radius: 99px;
+        }
+    }
+
+    .dash-drop-preview.#{$theme} {
+        color: map.get($palette, dot);
+    }
+
+    .smart-panel-dash-label.#{$theme} {
+        -arrow-background-color: map.get($palette, tooltip-bg);
+        color: map.get($palette, text);
+    }
+}

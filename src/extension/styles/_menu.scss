@@ -1,0 +1,49 @@
+@use 'sass:map';
+@use 'variables' as *;
+@use 'colors' as c;
+
+.debian-button {
+    padding: $debian-btn-padding;
+}
+
+.dash-app-button {
+    border-radius: $dash-app-radius;
+    font-weight: $fw-600;
+}
+
+.search-layout-button {
+    background-color: transparent;
+    border: none;
+    border-radius: $search-layout-radius;
+    box-shadow: none;
+    font-weight: $fw-600;
+    min-width: $search-layout-min-width;
+    padding: $search-layout-padding;
+}
+
+.indicator-button {
+    border-radius: $indicator-radius;
+}
+
+.system-section-button {
+    border-radius: $sys-btn-radius;
+    padding: $sys-btn-padding;
+}
+
+.date-button {
+    font-weight: $fw-600;
+    font-feature-settings: "tnum" 1;
+}
+
+.search-section {
+    padding: $search-padding;
+    spacing: $search-spacing;
+}
+
+.search-entry {
+    background-color: transparent !important;
+    border: none;
+    box-shadow: none;
+    min-width: 0;
+    padding: 0;
+}
