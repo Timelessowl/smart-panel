@@ -1,3 +1,4 @@
+import * as Session from '@/utils/session.js';
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
@@ -21,17 +22,24 @@ export class DashItem extends St.Bin {
             x_align: Clutter.ActorAlign.CENTER,
             y_expand: false,
         });
-        for (let index = 0; index < indicatorCount; index++)
+        this.setIndicatorCount(indicatorCount);
+    }
+
+    setIndicatorCount(count = 0) {
+        const dots = this.indicators.get_children();
+        for (const dot of dots.slice(count)) dot.destroy();
+        for (let index = dots.length; index < count; index++)
             this.indicators.add_child(
                 new St.Widget({
                     style_class: 'dash-window-dot',
                     x_align: Clutter.ActorAlign.CENTER,
                     y_align: Clutter.ActorAlign.CENTER,
-                })
+                }),
             );
     }
 
     setButton(actor) {
+        this.button = actor;
         const content = new St.BoxLayout({
             vertical: true,
             x_align: Clutter.ActorAlign.FILL,
@@ -49,54 +57,49 @@ export class DashIcon extends ShellDashIcon {
         GObject.registerClass({GTypeName: 'SimpleBottomPanelDashIcon'}, this);
     }
 
-    constructor(
-        entry,
-        owner,
-        iconSize,
-        notificationsMonitor = null,
-        scaleFactor = 1
-    ) {
+    constructor(entry, owner, iconSize, notificationsMonitor = null) {
         super(entry.item.app);
         this.entry = entry;
         this.item = entry.item;
         this.iconSize = iconSize;
         this._owner = owner;
+        this.draggable = this._draggable;
         this.dragDrop = null;
         this.dragging = false;
         this.style_class = 'dash-app-button';
         this.accessible_name = entry.item.name;
         this.label_actor = null;
         this.icon.setIconSize(iconSize);
-        const side = Math.round(iconSize * scaleFactor);
+        const side = Session.scale(iconSize);
         this.set_size(side, side);
         this.x_align = Clutter.ActorAlign.CENTER;
         this.y_align = Clutter.ActorAlign.CENTER;
-        this._windowPreview = null;
+        this._windowPreview = new WindowPreviewMenu(this, owner);
+        owner._previewMenuManager.addMenu(this._windowPreview);
         this._closeAllItem = null;
         this._badge = notificationsMonitor
-            ? new DashBadge(owner, this, this.app, notificationsMonitor)
+            ? new DashBadge(owner.settings, notificationsMonitor, this.app.get_id(), this._iconContainer, iconSize)
             : null;
-        this.connect('notify::hover', () => {
-            if (this.hover) this._getWindowPreview().scheduleOpen();
-            else this._windowPreview?.scheduleClose();
+        if (this._badge) this._iconContainer.add_child(this._badge);
+        this.connect('enter-event', (_icon, event) => {
+            if (!(event.get_flags() & Clutter.EventFlags.FLAG_GRAB_NOTIFY)) this._windowPreview.scheduleOpen();
+            return Clutter.EVENT_PROPAGATE;
+        });
+        this.connect('leave-event', (_icon, event) => {
+            if (!(event.get_flags() & Clutter.EventFlags.FLAG_GRAB_NOTIFY)) this._windowPreview.scheduleClose();
+            return Clutter.EVENT_PROPAGATE;
         });
         this.connect('key-press-event', (_icon, event) => {
-            if (event.get_key_symbol() !== Clutter.KEY_Up)
-                return Clutter.EVENT_PROPAGATE;
-            const preview = this._getWindowPreview();
+            if (event.get_key_symbol() !== Clutter.KEY_Up) return Clutter.EVENT_PROPAGATE;
+            const preview = this._windowPreview;
             preview.open();
             if (!preview.isOpen) return Clutter.EVENT_PROPAGATE;
-            preview.actor.navigate_focus(
-                null,
-                St.DirectionType.TAB_FORWARD,
-                false
-            );
+            preview.actor.navigate_focus(null, St.DirectionType.TAB_FORWARD, false);
             return Clutter.EVENT_STOP;
         });
 
         const fixed = entry.hardcoded && entry.group === 'favorites';
-        if (fixed && this.draggable.startGesture)
-            this.draggable.startGesture.enabled = false;
+        if (fixed && this.draggable.startGesture) this.draggable.startGesture.enabled = false;
         this.connect('notify::pressed', () => {
             if (!this.pressed) return;
             this._windowPreview?.close();
@@ -112,7 +115,6 @@ export class DashIcon extends ShellDashIcon {
                 this._syncCloseAllItem();
                 this._badge?.syncMenu(this._menu);
             }
-            this._owner.menuChanged(this._menu.actor, open);
         });
         this.connect('destroy', () => {
             this._windowPreview?.destroy();
@@ -120,7 +122,6 @@ export class DashIcon extends ShellDashIcon {
             this._badge?.destroy();
             this._badge = null;
             if (this._menu) {
-                this._owner?.menuChanged(this._menu.actor, false);
                 this._menu.destroy();
                 this._menu = null;
             }
@@ -129,42 +130,38 @@ export class DashIcon extends ShellDashIcon {
         });
     }
 
-    get draggable() {
-        return this._draggable;
-    }
-
-    _getWindowPreview() {
-        return (this._windowPreview ??= new WindowPreviewMenu(
-            this,
-            this._owner
-        ));
+    updateEntry(entry, iconSize) {
+        this.entry = entry;
+        this.item = entry.item;
+        this.accessible_name = entry.item.name;
+        if (this.iconSize !== iconSize) {
+            this.iconSize = iconSize;
+            this.icon.setIconSize(iconSize);
+        }
+        const side = Session.scale(iconSize);
+        this.set_size(side, side);
+        this._badge?.setIconSize(iconSize);
+        if (this._menu) this._syncCloseAllItem();
+        this._windowPreview.refresh();
     }
 
     // The app menu is built once by Shell and reused, so the item is created on
     // the first open and only its visibility follows the window count after.
     _syncCloseAllItem() {
         if (!this._closeAllItem) {
-            this._closeAllItem = new PopupMenu.PopupMenuItem(
-                Constants.DashMenuLabels.CLOSE_ALL
-            );
-            this._closeAllItem.connect('activate', () =>
-                this._owner?.closeAllWindows(this.entry)
-            );
+            this._closeAllItem = new PopupMenu.PopupMenuItem(Constants.DashMenuLabels.CLOSE_ALL);
+            this._closeAllItem.connect('activate', () => this._owner?.closeAllWindows(this.entry));
             this._menu.addMenuItem(this._closeAllItem);
         }
-        this._closeAllItem.visible =
-            this._owner?.canCloseAllWindows(this.entry) ?? false;
+        this._closeAllItem.visible = this._owner?.canCloseAllWindows(this.entry) ?? false;
     }
 
     activate(button) {
         if (this.dragging) return;
         this._windowPreview?.close();
         const modifiers = Clutter.get_current_event()?.get_state() ?? 0;
-        const newWindow =
-            button === Clutter.BUTTON_MIDDLE ||
-            (modifiers & Clutter.ModifierType.CONTROL_MASK) !== 0;
-        if (newWindow && this.app.can_open_new_window())
-            this._owner.openNewWindow(this.app);
+        const newWindow = button === Clutter.BUTTON_MIDDLE || (modifiers & Clutter.ModifierType.CONTROL_MASK) !== 0;
+        if (newWindow && this.app.can_open_new_window()) this._owner.openNewWindow(this.app);
         else this._owner.activateEntry(this.entry);
         Main.overview.hide();
     }

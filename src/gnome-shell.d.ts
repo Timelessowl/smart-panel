@@ -9,6 +9,7 @@ declare module '@girs/gnome-shell/ui/dash' {
 
     export class DashIcon extends AppIcon {
         constructor(app: Shell.App);
+        icon: AppIcon['icon'] & {setIconSize(size: number): void};
         _draggable: ReturnType<typeof DND.makeDraggable> & {
             startGesture?: Clutter.Action;
         };
@@ -16,5 +17,16 @@ declare module '@girs/gnome-shell/ui/dash' {
         _menu: AppMenu | null;
         activate(button?: number): void;
         _updateRunningStyle(): void;
+    }
+}
+
+declare module '@girs/gnome-shell/ui/grabHelper' {
+    import type Clutter from '@girs/clutter-16';
+    import type Shell from '@girs/shell-16';
+
+    export class GrabHelper {
+        constructor(owner: Clutter.Actor, params?: {actionMode: Shell.ActionMode});
+        grab(params: {actor: Clutter.Actor; focus?: Clutter.Actor; onUngrab?: () => void}): boolean;
+        ungrab(params?: {actor?: Clutter.Actor}): void;
     }
 }

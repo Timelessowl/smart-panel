@@ -29,6 +29,7 @@ export default {
     plugins: [
         alias({entries: [
             {find: '@girs/gnome-shell/ui/dash', replacement: 'resource:///org/gnome/shell/ui/dash.js'},
+            {find: '@girs/gnome-shell/ui/grabHelper', replacement: 'resource:///org/gnome/shell/ui/grabHelper.js'},
             {find: '@', replacement: src},
         ]}),
         nodeResolve({browser: false, preferBuiltins: true}),

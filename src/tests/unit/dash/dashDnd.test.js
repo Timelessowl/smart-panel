@@ -180,11 +180,6 @@ async function fixture(scale = 1, gestures = false) {
         new URL('extension/components/dash/dashSource.js', GjsHarness.sourceDirectory), imports);
     const theme = {addActor: actor => themeActors.add(actor),
         removeActor: actor => themeActors.delete(actor)};
-    const registrations = new Set();
-    const transient = {register(actor, dismiss, relatedActors) {
-        const registration = {actor, dismiss, relatedActors, paused: false};
-        registrations.add(registration); return registration;
-    }, unregister: registration => registrations.delete(registration)};
     const app = appId => ({get_id: () => appId, get_name: () => appId,
         is_window_backed: () => false,
         can_open_new_window: () => true,
@@ -238,7 +233,7 @@ async function fixture(scale = 1, gestures = false) {
         }
     }
     function panel(index = 0, width = 1000 * scale) {
-        const section = new DashSection(source, index, theme, transient, scale);
+        const section = new DashSection(source, index, theme, null, scale);
         section.setAvailableSize(width, 600 * scale);
         section.set_position(80, 500);
         allocate(section);
@@ -324,7 +319,7 @@ async function fixture(scale = 1, gestures = false) {
         return null;
     }
     return {panel, source, view, at, pick, dispatch, finish, monitors, chrome, themeActors,
-        DND, allocate, idles, timeouts, registrations, activatedWindows, makeWindow, pointer, pressAt, logs};
+        DND, allocate, idles, timeouts, activatedWindows, makeWindow, pointer, pressAt, logs};
 }
 
 describe('Dash drag and drop', () => {
@@ -723,42 +718,4 @@ describe('Dash drag and drop', () => {
         expect(Array.from(p._dragDrop._entries.running, entry => entry.item.appId)).toEqual(['calendar', 'terminal', 'settings']);
     });
 
-    it('expanded dismissal, reopening and panel destruction release menus and transient resources', async () => {
-        for (const scale of [1, 1.5, 2]) {
-            const f = await fixture(scale);
-            const p = f.panel(0, 250 * scale);
-            p._openExpanded();
-            const expanded = p._expandedSurface;
-            const registration = [...f.registrations][0];
-            expect(expanded.width).toBeLessThanOrEqual(250 * scale);
-            expect(expanded.height).toBeLessThanOrEqual(600 * scale);
-            expect(p._dash.visible).toBe(false);
-            const icon = [...p._dragDrop._icons].find(view => view.draggable && expanded.contains(view));
-            icon.button.menu.open();
-            expect(registration.relatedActors.has(icon.button.menu.actor)).toBe(true);
-            icon.draggable.emit('drag-begin');
-            expect(registration.paused).toBe(true);
-            f.finish(icon);
-            expect(registration.paused).toBe(false);
-            icon.button.menu.open();
-            registration.dismiss();
-            expect(p._expandedSurface).toBe(null);
-            expect(p._dash.visible).toBe(true);
-            expect(icon.button.menu.destroyed).toBe(true);
-            expect(f.registrations.size).toBe(0);
-            expect(f.chrome.size).toBe(0);
-            expect(f.themeActors.size).toBe(0);
-            expect(p._dragDrop._expandedSurface).toBe(null);
-            expanded.destroy();
-            p._openExpanded();
-            expect(p._expandedSurface).not.toBe(expanded);
-            expect(f.registrations.size).toBe(1);
-            p.destroy();
-            expect(f.registrations.size).toBe(0);
-            expect(f.chrome.size).toBe(0);
-            expect(f.themeActors.size).toBe(0);
-            expect(f.monitors.size).toBe(0);
-            expect(f.idles.size).toBe(0);
-        }
-    });
 });

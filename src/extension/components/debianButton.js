@@ -34,6 +34,8 @@ export class DebianButton extends BaseSection {
         this._button = button;
 
         this._menu = new PopupMenu.PopupMenu(this._button, 0.5, St.Side.BOTTOM);
+        this._menuManager = new PopupMenu.PopupMenuManager(this);
+        this._menuManager.addMenu(this._menu);
         this._menu.actor.add_style_class_name('debian-popup-menu');
         Main.layoutManager.uiGroup.add_child(this._menu.actor);
         this._menu.actor.hide();

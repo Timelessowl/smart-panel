@@ -14,9 +14,9 @@ Checked test tasks use API doubles; native acceptance remains separate.
 
 - [x] 2.1 Keep Launchpad fixed at 40px and use the 40/32/+N layout sequence with complete token widths; verify layout/overflow/independent-monitor cases in src/tests/unit/dash/dash.test.js.
 - [x] 2.2 Allocate count dots beneath the actual native icon without moving it; verify src/tests/unit/dash/dashIcon.test.js at both icon sizes and representative scales.
-- [x] 2.3 Keep expansion above windows and dismissal non-modal; verify source uses top chrome and src/tests/unit/input/transientInput.test.js checks outside-click pass-through, related menus, and Escape cleanup.
+- [x] 2.3 Keep expansion above windows with native GrabHelper dismissal and PopupMenuManager previews; verify source and src/tests/unit/input/nativePopups.test.js cover popup nesting, hover, preview activation/peeking, drag ownership and cleanup using API doubles.
 - [ ] 2.4 Validate native expansion with overflow and enough items to scroll; record frame/background retention, stacking, row access, and scroll-offset behavior.
-- [ ] 2.5 Validate native Escape and rapid outside clicks while typing/scrolling in another window; verify unrelated input still reaches that window.
+- [ ] 2.5 Validate native popup focus, Escape, rapid outside clicks, preview hover switching and DND cancellation in a GNOME Shell 48.7 session; confirm standard dismissal without application click replay.
 - [ ] 2.6 Validate initial layout, both icon sizes, dots, and narrow-width clipping at native X11/Wayland scales; record that search allocation is not crossed.
 
 ## 3. Activation, menus, and preferences
@@ -31,7 +31,7 @@ Checked test tasks use API doubles; native acceptance remains separate.
 ## 4. Drag-and-drop
 
 - [x] 4.1 Exclude decorative frames from picking and supply icon/section/grid delegates; verify src/tests/unit/dash/dashDnd.test.js exercises native-style parent traversal, padding targets, and expanded targets.
-- [x] 4.2 Apply panel-local order and system favorite membership after actor release; verify deferred-drop, fixed-launcher protection, and cross-panel membership cases in src/tests/unit/dash/dashDnd.test.js.
+- [x] 4.2 Apply persistent system favorite order/membership and panel-local running order after actor release; verify deferred-drop, fixed-launcher protection and shared favorite order in src/tests/unit/dash/dashRefactorDnd.test.js, plus persistence in dashSource.test.js.
 - [x] 4.3 Add the 16px translucent insertion preview without changing section width; verify before/after position, scale, pick exclusion, and leave/drop/destroy cleanup tests.
 - [x] 4.4 Keep shared source updates live during drag, defer only the dragging view rebuild, and refresh after actor release; verify cross-panel updates and geometry changes in src/tests/unit/dash/dashDnd.test.js.
 - [ ] 4.5 Add tests for a pending accepted drop cancelled by panel destruction, per-window running-order IDs, readonly favorite drops, and external drag rejection; verify no stale idle action mutates state.

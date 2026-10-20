@@ -11,10 +11,10 @@ acceptance is a separate remaining task.
 
 ## Goals / Non-Goals
 
-Goals: shared authoritative Shell state, monitor-local views and orders, deterministic
+Goals: shared authoritative Shell state, monitor-local views and running orders, persistent shared favorite order, deterministic
 activation, bounded layout, safe transient input, and real favorite mutations.
 
-Non-goals: persistent/shared drag order, active-workspace-only filtering, search
+Non-goals: persistent/shared running order, active-workspace-only filtering, search
 logic, restored stubs, external drag sources, favorite-to-running unpin by drag,
 and a third shrink size below 32 logical pixels.
 
@@ -32,20 +32,20 @@ stable identity, metadata, icon creation, and operations.
 `getEntries()` applies monitor scope, mode, local order and indicator rules internally;
 there is no separate projection module. Entries retain native app/window references
 without duplicate window fields. `DashIcon` renders entries and inherits its native
-native popup menu. `dashUtils` contains `DashActions` for monitor-local activation
-and `DashLaunches` for shared pending launches. No replacement model classes are needed.
+popup menu. `dashUtils` contains stateless action helpers. `DashSection` owns
+activation cycles and `DashSource` owns shared pending launches. No replacement model classes are needed.
 
 ### One source, monitor-specific entries
 
 The extension owns one `DashSource` GObject with a `changed` signal, which observes Shell AppSystem,
-WindowTracker, AppFavorites, window events, and the two settings. It reuses
+AppFavorites, window events, and the two settings. It reuses
 native app/window references and coalesces refreshes. It exposes
 `getFavorites()`, `getRunningApps()`, `getOpenedWindows()`,
 `getOpenMonitorWindows(monitor)`, `getAppWindows(app, monitor)`, and
-`getWindowApp(window)` and `getEntries({monitor, favoriteOrder, runningOrder})`.
+`getWindowApp(window)` and `getEntries({monitor, runningOrder})`.
 Returned collections are copies. Each `DashSection` requests complete entries;
 it does not reconstruct app/window maps or fixed-favorite sets. App-wide metadata
-is shared; entries, views, local order, expansion and activation cycles are monitor-specific.
+is shared; entries, views, running order, expansion and activation cycles are monitor-specific.
 Each `DashSection` owns a `connectObject('changed', ..., this)` connection to the
 source. Native actor destruction disconnects that listener; there is no custom
 subscription registry or MonitorManager update relay. The section emits
@@ -53,10 +53,8 @@ subscription registry or MonitorManager update relay. The section emits
 `connectObject` connection to that signal for bounds updates. DND requests a
 refresh directly from its owning section instead of passing change callbacks.
 
-The source checks Firefox IDs in order: `firefox.desktop`, `firefox-esr.desktop`,
-`org.mozilla.firefox.desktop`. Files uses `org.gnome.Nautilus.desktop`. These
-apps are hard prerequisites by user decision; absence/error-placeholder policy
-is outside this baseline. Fixed favorites are deduplicated from the system list.
+The fixed IDs are `org.gnome.Nautilus.desktop` and `thunderbird.desktop`, in that
+order. Installed fixed favorites are deduplicated from the system list.
 Running app order is derived from oldest eligible stable window sequence, with
 app ID as tie-breaker, rather than Shell's MRU order.
 
@@ -85,9 +83,9 @@ The running separator exists only with running items and stays with the first
 running token when `expandedRows()` wraps. `expandedLayout()` supplies positions and
 bounds as well as rows, so expanded actors do not repeat layout arithmetic.
 `ExpandedDash` extends `BaseSection` and owns the expanded grid, scroll view,
-chrome, theme and dismissal registrations. `DashSection` only opens/closes it and
-provides the same token factory used by the collapsed view. DND requests dismissal
-suspension through `setDragging()`, without owning the transient registration. On exceptionally narrow allocations
+chrome, theme and native grab. `DashSection` only opens/closes it and
+provides the same token reconciliation used by the collapsed view. Native DND's own
+grab supersedes expansion input during a drag. On exceptionally narrow allocations
 the section clips rather than invading search; no extra behavior is invented.
 
 ### Icon buttons and indicators are separate actors
@@ -107,16 +105,48 @@ change with running state. Only the button handles activation, menus and drag
 initiation; the dots and surrounding bin are non-reactive. Expanded and collapsed
 rows use the same actors and scale their button size to native stage coordinates.
 
-### Expansion is a non-modal top-chrome surface
+### Expansion uses native popup input
 
 Expansion uses another BaseSection with an opaque themed scroll view and fixed
 grid, registered through `Main.layoutManager.addTopChrome()` without a strut.
 It opens upward, anchored to the collapsed section's bottom, within supplied
 width/height limits. The collapsed surface is hidden while expansion is shown.
 This is necessary to stay above windows without reserving extra work area.
-TransientInputManager registers temporary Escape dismissal and observes pointer
-presses without grabbing or consuming outside input. Related app menus count as
-inside; outside-pointer dismissal pauses during a drag.
+Shell's GrabHelper handles Escape and outside-click dismissal, following the
+app-folder dialog pattern in GNOME Shell 48.7. This uses standard popup focus
+semantics; outside clicks are not replayed to applications. A dismissed surface
+is hidden and detached for reuse. Source and geometry changes update both
+containers in place; explicit close actions and panel teardown destroy the
+expansion. The actor survives onUngrab because GrabHelper invokes that callback
+before releasing its modal grab.
+
+Window previews remain PopupMenu instances. Each dash registers all its preview
+sources with one native PopupMenuManager, permitting native hover switching.
+Real crossing events retain hover delays; FLAG_GRAB_NOTIFY crossings do not
+schedule opening or closure. App menus keep their inherited manager. Nested
+popup grabs close the top surface first, while DND owns input during dragging.
+There is no pointer poll, global Escape binding, related-actor registry, or
+replacement dismissal module.
+
+### Source refresh preserves view identity
+
+DashSection reconciles each container's token actors instead of destroying its
+children. Favorites use their app ID as a stable key, including when their
+represented window changes in per-window mode. Running entries use their
+existing app/window item ID. Native set_child_at_index reorders surviving
+actors without unmapping their menu sources. Only missing identities are
+destroyed, and only new identities create icons.
+
+DashIcon updates its entry, accessible name and icon size in place; DashItem
+adjusts only the changed indicator dots. ExpandedDash retains its grid and
+scroll view while updating placement, bounds and bottom anchoring.
+
+An open preview refreshes after the source's authoritative state is published.
+Its existing window-keyed row map retains surviving items and compositor
+clones. The additional app-level windows-changed observer was removed because
+it could redisplay before DashSource updated its monitor-scoped snapshot.
+The preview closes when its window list becomes empty or its source disappears,
+not when another window or neighboring app changes.
 
 ### Activation follows explicit state
 
@@ -128,7 +158,7 @@ focus or minimize a window that has moved off its monitor. Empty favorites
 request a new window; with monitor filtering they never select a remote window.
 
 Shell's `open_new_window()` and `launch_action()` have a workspace argument but
-no monitor argument. `DashLaunches` records pre-launch windows and observes the
+no monitor argument. `DashSource` records pre-launch windows and observes the
 first new eligible window for each requested app. It moves only that new window
 to the requested monitor, and repeats placement on its first frame to account
 for initial mapping. Existing windows are excluded; simultaneous requests claim
@@ -163,11 +193,12 @@ Native icons are wrapped by the shared `DashItem` bin. Shared frames and inserti
 previews are hidden from pick. An opaque decorative actor must not
 terminate target traversal before a delegate can be reached.
 
-Orders are per-section app IDs for favorites and app/stable-window IDs for running. Fixed
-favorite icons are not draggable. A running-to-favorites drop updates the target
-panel's favorite order and GNOME AppFavorites membership. Other panels receive
-the membership event but keep their own order arrays. No order is saved to
-GSettings; panel recreation/Shell reload resets local ordering.
+Favorite order is saved with one `global.settings.set_strv('favorite-apps', ids)`
+write, including new membership for a running-to-favorites drop. Fixed launchers
+stay first; unavailable desktop IDs already stored in GNOME are preserved.
+AppFavorites observes the system change, and all panels adopt the saved order.
+Favorite changes are rejected when the setting is read-only. Running app/stable-
+window ID order stays per-section and resets when that panel is recreated.
 
 ### Preview and mutations have separate lifecycle
 
@@ -179,13 +210,13 @@ Size and opacity are in src/constant.js. Per-section DND monitors and a source
 drag-end subscription remove it on leave, invalid hover, drop, cancellation,
 close/refresh, or destruction.
 
-Drag begin defers only that section's actor rebuild and outside-pointer
-dismissal. The shared source keeps observing Shell and other panels keep
+Drag begin defers only that section's actor reconciliation. Native DND owns
+input while the shared source keeps observing Shell and other panels keep
 refreshing. Source and geometry changes mark the dragging view for refresh after
 actor release. Drop returns acceptance immediately but defers favorite/order
 updates to an idle callback after DND releases its actors. Drag-end schedules
 any pending view refresh for an idle callback. Success does not restore the
-dragged clone before the queued rebuild.
+dragged clone before the queued update.
 
 ### Menus and preferences use native boundaries
 
@@ -195,8 +226,7 @@ native favorite controls. Shell owns dismissal; removed icons destroy their
 native menu actors.
 The source updates system favorites through AppFavorites rather than a separate
 extension list. Preferences bind `per-window-mode` and `monitor-only`, both
-boolean/default false, to Adw switch rows; neither local order nor old overlay
-settings are persisted.
+boolean/default false, to Adw switch rows; running order remains temporary, while favorite order is saved in GNOME settings.
 
 ## Risks / Trade-offs
 
@@ -216,6 +246,6 @@ settings are persisted.
 The real-dash migration already removed all stub modules and controls. The
 installer ships the source/view modules, preferences, and compiled schema, and
 removes obsolete installed stub files by exact name. Do not restore the old app
-count preference or persist local order. Future verification fixes use the same
-file installer and proper Shell restart; the user's system favorite membership
+count preference or persist running order. Future verification fixes use the same
+file installer and proper Shell restart; the user's system favorite membership and order
 must not be reset during rollback.

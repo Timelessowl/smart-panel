@@ -27,14 +27,32 @@ export async function loadGjsModule(path, imports, globals = {}) {
         return pending;
     }
     const root = await load(path.href);
-    await root.link((specifier, parent) => {
+    function resolve(specifier, parent) {
+        if (imports[specifier]) return specifier;
         if (specifier.startsWith('@/'))
-            return load(new URL(`${specifier.slice(2)}${/\.\w+$/.test(specifier) ? '' : '.js'}`, sourceDirectory).href);
-        if (specifier.startsWith('@girs/'))
-            return load(import.meta.resolve(specifier));
-        return load(specifier.startsWith('.')
-            ? new URL(specifier, parent.identifier).href : specifier);
-    });
+            return new URL(`${specifier.slice(2)}${/\.\w+$/.test(specifier) ? '' : '.js'}`, sourceDirectory).href;
+        if (specifier.startsWith('@girs/')) {
+            const resource = specifier.replace('@girs/gnome-shell/', 'resource:///org/gnome/shell/') + '.js';
+            return imports[resource] ? resource : import.meta.resolve(specifier);
+        }
+        return specifier.startsWith('.') ? new URL(specifier, parent.identifier).href : specifier;
+    }
+    // Validate doubles before Node links dependencies concurrently. Otherwise
+    // one missing GI mock can leave unrelated rejected link promises behind and
+    // incorrectly fail a later Jasmine suite through an unhandled rejection.
+    const prepared = new Set();
+    async function prepare(module) {
+        if (prepared.has(module.identifier)) return;
+        prepared.add(module.identifier);
+        for (const specifier of module.dependencySpecifiers ?? []) {
+            const url = resolve(specifier, module);
+            if (!imports[url] && !url.startsWith('file:'))
+                throw new Error(`Missing GJS API double: ${specifier}`);
+            await prepare(await load(url));
+        }
+    }
+    await prepare(root);
+    await root.link((specifier, parent) => load(resolve(specifier, parent)));
     await root.evaluate();
     return root.namespace;
 }

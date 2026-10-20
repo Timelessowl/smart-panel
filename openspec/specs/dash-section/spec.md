@@ -11,8 +11,7 @@ window activation, context actions, and drag-and-drop.
 An eligible window is a tracked application window that is not marked skip-taskbar.
 Window order means ascending stable sequence (oldest opened first), not recent
 focus order. Visible windows are eligible windows after any monitor filter.
-All workspaces are included. Fixed favorites are Firefox and Files; both are
-installation prerequisites. The Launchpad is not an application/window item.
+All workspaces are included. Fixed favorites are Files and Thunderbird, when installed. The Launchpad is not an application/window item.
 
 ## Requirements
 
@@ -24,8 +23,8 @@ presentation. Focusing another app SHALL NOT reorder running icons by recency.
 One shared source SHALL expose favorites, running apps, eligible open windows,
 and windows by monitor through explicit queries returning native Shell objects.
 The source SHALL derive complete monitor-specific rendering entries through
-`getEntries({monitor, favoriteOrder, runningOrder})`. Monitor views SHALL own actors
-and local order; entry derivation SHALL NOT modify shared state. The source SHALL
+`getEntries({monitor, runningOrder})`. Monitor views SHALL own actors
+and local running order; entry derivation SHALL NOT modify shared state. The source SHALL
 be a GObject emitting `changed` after state refresh. Each dash section SHALL own
 its `connectObject` connection, disconnected on section destruction, without a
 MonitorManager update relay or custom subscription registry.
@@ -72,20 +71,20 @@ There SHALL be no separator between Launchpad and favorites.
 
 ### Requirement: Favorite identity and fixed entries
 
-The favorite subsection SHALL include GNOME's system favorites, with Firefox
-first and Files second even if absent from that list. Those two entries SHALL
+The favorite subsection SHALL include GNOME's system favorites, with Files
+first and Thunderbird second even if absent from that list. Those two entries SHALL
 NOT be duplicated, removed, unfavorited, or dragged. Other favorite entries
 SHALL retain their slots even when no matching window is running.
 
 #### Scenario: Fixed apps are not system favorites
 
-- **WHEN** the system favorites list omits Firefox and Files
+- **WHEN** the system favorites list omits Files and Thunderbird
 - **THEN** both still occupy the first two favorite slots.
 
 #### Scenario: Fixed app is also in the system list
 
-- **WHEN** Firefox already appears in GNOME favorites
-- **THEN** only one Firefox favorite icon is shown
+- **WHEN** Files already appears in GNOME favorites
+- **THEN** only one Files favorite icon is shown
 - **AND** it offers neither unpin nor drag behavior.
 
 ### Requirement: Per-app representation
@@ -209,7 +208,7 @@ from the dash, above application windows, with its opaque themed surface and
 frame intact. Overflow SHALL become real items in the expanded layout. Expansion
 SHALL stay within the available dash width and usable monitor height; excess
 vertical content SHALL be scrollable. A dedicated `ExpandedDash` subclass of
-`BaseSection` SHALL own expanded content, scrolling, transient registrations and
+`BaseSection` SHALL own expanded content, scrolling, its native grab and
 cleanup, using the same token creation path as the collapsed dash.
 
 #### Scenario: Hidden items are revealed
@@ -218,27 +217,39 @@ cleanup, using the same token creation path as the collapsed dash.
 - **THEN** all three hidden items become accessible in the upward grid
 - **AND** the `+3` control is not retained as an extra item in that grid.
 
-### Requirement: Non-modal expansion dismissal
+### Requirement: Native popup dismissal
 
-Escape SHALL close the expanded dash. Clicking outside it and any related app
-context menu SHALL close it without consuming that pointer event. The expansion
-SHALL NOT grab unrelated keyboard, scroll, or pointer input. A drag SHALL suspend
-outside-pointer dismissal until the drag ends.
+The expanded dash SHALL use Shell's existing GrabHelper for popup focus and
+dismissal. Escape or an outside click SHALL close it. Outside clicks SHALL use
+native dismissal semantics without application click replay. App context menus
+and window previews SHALL use native PopupMenuManager instances. A popup above
+the expansion SHALL close before the expansion itself. Native DND SHALL own
+input and Escape cancellation while a drag is active. No custom dismissal
+manager, pointer polling, or global Escape accelerator SHALL be introduced.
 
 #### Scenario: Outside click targets another window
 
 - **WHEN** the user clicks a terminal outside the expanded dash
-- **THEN** expansion closes and the terminal still receives the click.
+- **THEN** expansion closes using native popup dismissal
+- **AND** that click is not replayed to the terminal.
 
 #### Scenario: Escape is pressed
 
 - **WHEN** expansion is open and the user presses Escape
-- **THEN** it closes and its temporary Escape registration is released.
+- **THEN** the topmost popup closes and its native grab is released
+- **AND** a second Escape closes the expansion if a child popup was open.
 
 #### Scenario: An app context menu is clicked
 
 - **WHEN** the user clicks within an expanded icon's related context menu
 - **THEN** outside-pointer dismissal does not prematurely close the expansion.
+
+#### Scenario: Window previews are used within expansion
+
+- **WHEN** the user opens a window preview from an expanded icon
+- **THEN** live thumbnails, window activation, hover peeking and keyboard access
+  remain available above the expansion
+- **AND** dismissing the preview alone leaves expansion usable.
 
 ### Requirement: Deterministic app activation cycle
 
@@ -264,15 +275,20 @@ specific window; clicking an idle favorite SHALL open a new app window.
 
 ### Requirement: App context actions
 
-App icons SHALL derive from GNOME's PanelMenu.Button and use a standard popup
-menu with native lifecycle and a shared menu manager. Drag/drop handling SHALL
-reside in a separate dash module.
+App icons SHALL derive from Shell's exported ui/dash.DashIcon and retain its
+native AppMenu and menu manager. Window previews SHALL share a native popup
+menu manager per dash. Drag/drop handling SHALL reside in a separate dash module.
 
 Right-clicking an app/window icon SHALL open its available desktop-file actions.
 It SHALL offer a new-window action when supported and not already present,
 a close-window action when representing a specific window, and favorite controls
 for non-fixed, pinnable apps when the system list is writable. An app without
 other available actions SHALL still have an activation action.
+
+#### Scenario: Right-click while a preview is open
+
+- **WHEN** an icon receives a secondary-button press while its preview owns input
+- **THEN** that same press closes the preview and opens its native context menu.
 
 #### Scenario: Unfavoriting is available
 
@@ -284,21 +300,26 @@ other available actions SHALL still have an activation action.
 - **WHEN** the system favorites setting is read-only
 - **THEN** no action that would add or remove a favorite is offered.
 
-### Requirement: Local drag ordering and global membership
+### Requirement: Persistent favorite order and local running order
 
-Dragging a non-fixed item within its subsection SHALL reorder only the target
-panel, without persisting that order across Shell reload. Dropping a pinnable
-running item into favorites SHALL add its app to GNOME's system favorites and
-position it locally at the drop location, after the fixed entries. Other panels
-SHALL receive the membership change without adopting the dragged panel's order.
-Dragging a favorite into running SHALL NOT act as an implicit unpin action.
+Dragging a non-fixed favorite SHALL save the new order in `org.gnome.shell`'s
+`favorite-apps` setting. Every panel SHALL follow that order, including after
+Shell reload. Dropping a pinnable running item into favorites SHALL add its app
+at the saved drop position after fixed entries. Existing unavailable desktop IDs
+SHALL be preserved. Read-only settings SHALL reject favorite changes.
+Running reordering SHALL remain local to the target panel for the current
+session. Dragging a favorite into running SHALL NOT implicitly unpin it.
+
+#### Scenario: Favorites are reordered
+
+- **WHEN** a non-fixed favorite is moved before another favorite
+- **THEN** the system list is saved in that order
+- **AND** every panel and the next Shell session show that order after fixed entries.
 
 #### Scenario: Running item is favorited by drop
 
-- **WHEN** a running app is dropped immediately after Files in favorites
-- **THEN** it becomes a system favorite
-- **AND** it occupies that position on the target panel only
-- **AND** Firefox and Files retain their first two slots.
+- **WHEN** a running app is dropped immediately after the fixed launchers
+- **THEN** it becomes a system favorite at that position on every panel.
 
 #### Scenario: Running order is changed
 
@@ -326,12 +347,34 @@ in the project's layout constants.
   or its panel is destroyed
 - **THEN** its insertion preview is removed and does not block future picking.
 
+### Requirement: Stable dash and preview identity
+
+Source and geometry updates SHALL reconcile existing dash items by app/window
+identity, updating order, entry metadata, icon sizes and dots in place. The
+expanded grid and scroll view SHALL survive these updates. Only removed
+identities SHALL be destroyed; only new identities SHALL create actors.
+An open window preview SHALL update its existing list and retain surviving
+thumbnail actors. An empty preview or a removed source SHALL close normally.
+
+#### Scenario: One of two preview windows is closed
+
+- **WHEN** the user closes one of two app windows using its preview close button
+- **THEN** the same icon and preview menu remain alive and open
+- **AND** only the closed window's thumbnail is removed
+- **AND** the remaining thumbnail and updated window count stay visible in
+  either the collapsed or expanded dash.
+
+#### Scenario: Another app changes or an item moves
+
+- **WHEN** a different app is added, removed or reordered
+- **THEN** surviving item actors and their open previews are preserved.
+
 ### Requirement: Safe refresh during drag and drop
 
 The shared dash source SHALL continue observing and updating state during a
-drag. Only the dragging panel's actor rebuild SHALL be deferred while its drag
+drag. Only the dragging panel's actor reconciliation SHALL be deferred while its drag
 actors are in use. Other panels SHALL continue updating. An accepted drop SHALL
-finish releasing drag actors before rebuilding views. Ending or cancelling a
+finish releasing drag actors before reconciling views. Ending or cancelling a
 drag SHALL apply pending view updates and clean up drag-specific state.
 
 #### Scenario: Source changes while dragging

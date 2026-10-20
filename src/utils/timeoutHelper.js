@@ -6,7 +6,16 @@ export default class TimeoutManager {
     }
 
     addTimeout(label, timeout, action, priority = GLib.PRIORITY_DEFAULT) {
-        const timeoutId = GLib.timeout_add(priority, timeout, action);
+        this.clearTimeout(label);
+        const timeoutId = GLib.timeout_add(priority, timeout, () => {
+            this._timeouts.delete(label);
+            const result = action();
+            if (result === GLib.SOURCE_CONTINUE) {
+                if (this._timeouts.has(label)) return GLib.SOURCE_REMOVE;
+                this._timeouts.set(label, timeoutId);
+            }
+            return result;
+        });
         this._timeouts.set(label, timeoutId);
     }
 
@@ -18,11 +27,11 @@ export default class TimeoutManager {
         const timeoutId = this._timeouts.get(label);
         if (!timeoutId) return; //TODO Logger?
         GLib.source_remove(timeoutId);
-        this._timeouts.set(label, 0);
+        this._timeouts.delete(label);
     }
 
     destroy() {
-        this._timeouts.forEach(id => {
+        this._timeouts.forEach((id) => {
             GLib.source_remove(id);
         });
         this._timeouts.clear();

@@ -1,3 +1,4 @@
+import * as Session from '@/utils/session.js';
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
@@ -13,7 +14,7 @@ export class IndicatorSection extends BaseSection {
         GObject.registerClass(this);
     }
 
-    constructor(indicators = [], scaleFactor = 1) {
+    constructor(indicators = []) {
         super();
         this.canExpand = true;
 
@@ -26,7 +27,7 @@ export class IndicatorSection extends BaseSection {
 
         this._indicators = [];
         this._menus = [];
-        this._scaleFactor = scaleFactor;
+        this._menuManager = new PopupMenu.PopupMenuManager(this);
         this.hasIndicators = false;
         this.preferredWidth = 0;
 
@@ -46,12 +47,10 @@ export class IndicatorSection extends BaseSection {
 
         this.hasIndicators = this._indicators.length > 0;
         this.preferredWidth = this.hasIndicators
-            ? Constants.INDICATOR_MIN_WIDTH +
-                (this._indicators.length - 1) * Constants.INDICATOR_WIDTH_STEP
+            ? Constants.INDICATOR_MIN_WIDTH + (this._indicators.length - 1) * Constants.INDICATOR_WIDTH_STEP
             : 0;
 
-        for (const indicator of this._indicators)
-            this._addIndicator(indicator);
+        for (const indicator of this._indicators) this._addIndicator(indicator);
 
         this.visible = this.hasIndicators;
     }
@@ -66,10 +65,11 @@ export class IndicatorSection extends BaseSection {
                 icon_size: Constants.INDICATOR_ICON_SIZE,
             }),
         });
-        const itemSize = Math.round(Constants.INDICATOR_ITEM_SIZE * this._scaleFactor);
+        const itemSize = Session.scale(Constants.INDICATOR_ITEM_SIZE);
         button.set_size(itemSize, itemSize);
 
         const menu = new PopupMenu.PopupMenu(button, 0.5, St.Side.BOTTOM);
+        this._menuManager.addMenu(menu);
         Main.layoutManager.uiGroup.add_child(menu.actor);
         menu.actor.hide();
 
@@ -85,8 +85,7 @@ export class IndicatorSection extends BaseSection {
     }
 
     _clearIndicators() {
-        for (const menu of this._menus)
-            menu.destroy();
+        for (const menu of this._menus) menu.destroy();
 
         this._menus = [];
         this._indicatorBox.destroy_all_children();
@@ -97,7 +96,6 @@ export class IndicatorSection extends BaseSection {
         this._indicators = [];
         this.hasIndicators = false;
         this.preferredWidth = 0;
-        this._scaleFactor = 1;
         super.destroy();
     }
 }

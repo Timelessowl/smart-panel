@@ -91,8 +91,10 @@ in BaseSection is retained for comparison.
 
 `src/extension/monitorManager.js` discovers monitors dynamically and owns one independent
 panel instance per monitor. Panels are rebuilt when the monitor layout changes.
-Each panel determines its own scale in its constructor: Wayland uses a factor of
-one, while X11 uses that monitor's `geometry_scale`.
+`Session.scale(value)` in `src/utils/session.js` scales actor dimensions using the
+primary monitor's `geometry_scale`. Panels, layouts, previews and indicator buttons
+use that helper directly; scale factors are not passed through constructors. CSS
+and `St.Icon.icon_size` values stay logical so St applies its own scaling once.
 
 ## Dash
 
@@ -101,25 +103,51 @@ views, `ExpandedDash`, and dash layout, action and drag/drop helpers.
 The source exposes native `Shell.App` and `Meta.Window` objects through
 `getFavorites()`, `getRunningApps()`, `getOpenedWindows()`,
 `getOpenMonitorWindows(monitor)`, and `getAppWindows(app, monitor)`.
-`getEntries({monitor, favoriteOrder, runningOrder})` returns complete monitor-scoped
-favorite/running entries. `DashActions` in `dashUtils.js` owns each dash's activation
-cycle; `DashLaunches` shares pending launch placement through the source so concurrent
-monitor requests cannot claim the same window. `ExpandedDash` extends `BaseSection`
-and owns its grid, scrolling and transient cleanup. `DashSection` assembles the
+`getEntries({monitor, runningOrder})` returns complete monitor-scoped
+favorite/running entries. `DashSection` owns its activation cycle, while `dashUtils.js` contains stateless
+action helpers. `DashSource` owns pending launch placement so concurrent monitor
+requests cannot claim the same window. `ExpandedDash` extends `BaseSection`
+and owns its grid, scrolling and native grab lifecycle. `DashSection` assembles the
 collapsed view and shares token creation with expansion. `DashDragDrop` owns session-only
-local order; `BottomPanel` remains the authority for allocated bounds. Each
+running order and persists favorite drops through GNOME's `favorite-apps` setting; `BottomPanel` remains the authority for allocated bounds. Each
 `DashSection` connects to the source's `changed` signal with `connectObject`,
 which disconnects when that section is destroyed. `BottomPanel` similarly listens
 to the section's `layout-changed` signal to update its allocated width.
 `MonitorManager` only creates and destroys monitor panels; it does not relay dash updates.
 
+Source changes reconcile the collapsed row and expanded grid by app/window
+identity. Existing icons, menus, scroll views and surviving preview thumbnails
+stay alive; only added or removed items change actors. Labels, sizes and window
+dots update in place. Closing one of an app's preview windows keeps that menu
+open with the remaining windows. Closing the last window closes its empty
+preview; a pinned app's launcher remains available.
+
 Launchpad toggles overview and follows the dash’s 40/32 px icon size. Favorites follow GNOME's
-list, with Firefox and Files fixed first. They cannot be removed or dragged.
+list, with Files and Thunderbird fixed first. They cannot be removed or dragged.
 Running items start with a separator; the empty running subsection is hidden.
 App icons start at 40px, shrink to 32px when space runs out, then use a `+N`
 overflow button. Each monitor makes that decision independently. The expanded
-view opens upward above windows and scrolls vertically if necessary. Escape or
-an outside click closes it without grabbing unrelated pointer input.
+view opens upward above windows and scrolls vertically if necessary. Shell's
+`GrabHelper` handles Escape and outside-click dismissal with standard popup
+focus behavior. An outside click dismisses the popup; it is not replayed to an
+application. A preview or app menu above the grid closes before the grid itself.
+Native DND owns input during a drag, including Escape cancellation.
+
+Window previews remain live, clickable popup menus with hover opening, window
+peeking and keyboard access. Each dash shares one native `PopupMenuManager`
+across its preview sources, so Shell can switch previews while a grab is active.
+App context menus retain the icon's inherited manager. Debian and indicator menus
+also use native menu managers. No pointer polling or global Escape accelerator
+is used for dismissal. The [input refactor analysis](docs/native-popup-input-review.md)
+records the GNOME Shell 48.7 references and verification limits.
+
+Notification badges are native `St.Label` actors with settings and monitor
+dependencies supplied directly. They follow the configured app allowlist and
+Do Not Disturb. The GObject notification monitor observes Shell message-tray
+sources, aggregates sources by desktop ID, and follows urgency independently of
+count changes. One persistent, nonreactive `DashLabel` pointer per dash owns its
+show/reset timers and is destroyed with its section. Right-clicking an icon
+while its preview holds a grab transfers that press to the native app menu.
 
 Preferences provide two toggles, both off by default:
 
@@ -150,13 +178,15 @@ rounded. Fixed launchers keep native menus but omit favorite changes and cannot
 start a drag.
 
 `DashDragDrop` owns draggable setup, drop delegates, previews, local order,
-and deferred refresh, leaving `DashSection` to assemble the dash and delegate actions. Dragging
-reorders within a subsection on that monitor only; dragging a running item into
-Favorites adds it to GNOME's system favorites. Local ordering is not persisted.
+and deferred refresh, leaving `DashSection` to assemble the dash and delegate actions. Dragging reorders running items on that monitor for the current session. Favorite
+reordering and running-to-favorite drops write `org.gnome.shell`'s `favorite-apps`
+list, so every panel adopts the saved order and it survives Shell reload. Fixed
+launchers remain first, and unavailable desktop IDs already in the system list
+are preserved. Locked favorite settings reject favorite drops.
 Valid drop targets show a translucent 16px app-icon preview at the insertion
 point, without resizing the dash. Its size and opacity live in `src/extension/constants.js`.
 Shell state continues updating during a drag. Only the dragged dash’s view
-rebuild waits until drag actors are released; other panels update immediately.
+update waits until drag actors are released; other panels update immediately.
 `DashDragDrop` observes the icon's inherited draggable rather than creating a
 second drag handler. Journal messages prefixed `[dash-dnd]` report native presses,
 starts, cancellation/end, accepted drops, applied orders and rejection reasons.

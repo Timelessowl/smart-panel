@@ -1,14 +1,18 @@
 import * as GjsHarness from '@/tests/gjsHarness.js';
-import * as DashLayout from '@/extension/components/dash/dashLayout.js';
+import * as Constants from '@/extension/constants.js';
+let DashLayout;
+const layoutManager = {primaryMonitor: {geometry_scale: 1}};
 let DashSource;
 let DashUtils;
 beforeAll(async () => {
     const imports = {'gi://GLib': {default: {}}, 'gi://Shell': {default: {}},
         'gi://GObject': {default: GjsHarness.createGObjectDouble()},
         'resource:///org/gnome/shell/ui/appFavorites.js': {},
-        'resource:///org/gnome/shell/ui/main.js': {}};
+        'resource:///org/gnome/shell/ui/main.js': {layoutManager}};
     ({DashSource} = await GjsHarness.loadGjsModule(
         new URL('extension/components/dash/dashSource.js', GjsHarness.sourceDirectory), imports));
+    DashLayout = await GjsHarness.loadGjsModule(
+        new URL('extension/components/dash/dashLayout.js', GjsHarness.sourceDirectory), imports);
     DashUtils = await GjsHarness.loadGjsModule(
         new URL('extension/components/dash/dashUtils.js', GjsHarness.sourceDirectory), imports);
 });
@@ -33,6 +37,8 @@ const snapshot = overrides => {
 function entries(data) {
     const source = Object.create(DashSource.prototype);
     source._state = {...data, fixedIds: data.hardcodedIds};
+    source.perWindow = data.perWindow;
+    source.monitorOnly = data.monitorOnly;
     source._windows = new Map(data.windows.map(window => [window, {app: window.app}]));
     return source.getEntries({monitor: data.monitorIndex,
         favoriteOrder: data.favoriteOrder, runningOrder: data.runningOrder});
@@ -90,10 +96,10 @@ describe('Dash entries, layout and actions', () => {
         expect(closed.favorites[0].indicatorCount).toBe(0);
     });
 
-    it('fixed favorites stay first and panel-local order does not mutate source', () => {
+    it('favorite entries follow the shared system order without a panel override', () => {
         const data = snapshot({favorites: [firefox, files, terminal, editor], running: []});
         const local = entries({...data, favoriteOrder: ['editor', 'firefox', 'terminal', 'files']});
-        expect(local.favorites.map(entry => entry.item.appId)).toEqual(['firefox', 'files', 'editor', 'terminal']);
+        expect(local.favorites.map(entry => entry.item.appId)).toEqual(['firefox', 'files', 'terminal', 'editor']);
         expect(entries(data).favorites.map(entry => entry.item.appId)).toEqual(['firefox', 'files', 'terminal', 'editor']);
     });
 
@@ -107,19 +113,19 @@ describe('Dash entries, layout and actions', () => {
     it('40px then 32px then overflow, including launchpad, separator and frame widths', () => {
         const groups = entries(snapshot());
         const items = [...groups.favorites, ...groups.running];
-        const wide = DashLayout.layoutDash(items, 1000, 11);
+        const wide = DashLayout.layoutDash(items, 1000);
         expect(wide.iconSize).toBe(40);
-        expect(wide.width).toBe(238);
-        expect(DashLayout.layoutDash(items, wide.width, 11).iconSize).toBe(40);
-        const small = DashLayout.layoutDash(items, wide.width - 1, 11);
+        expect(wide.width).toBe(230);
+        expect(DashLayout.layoutDash(items, wide.width).iconSize).toBe(40);
+        const small = DashLayout.layoutDash(items, wide.width - 1);
         expect(small.iconSize).toBe(32);
         expect(small.hiddenCount).toBe(0);
-        expect(small.width).toBe(206);
-        const overflow = DashLayout.layoutDash(items, small.width - 1, 11);
+        expect(small.width).toBe(198);
+        const overflow = DashLayout.layoutDash(items, small.width - 1);
         expect(overflow.iconSize).toBe(32);
         expect(overflow.hiddenCount).toBeGreaterThan(0);
         expect(overflow.width).toBeLessThanOrEqual(small.width - 1);
-        expect(overflow.tokens[0].width).toBe(40);
+        expect(overflow.tokens[0].width).toBe(32);
         expect(overflow.tokens.at(-1).hiddenCount).toBe(overflow.hiddenCount);
     });
 
@@ -127,42 +133,45 @@ describe('Dash entries, layout and actions', () => {
         const entries = Array.from({length: 20}, (_, index) => ({
             item: app(`${index}`), group: index < 2 ? 'favorites' : 'running',
         }));
-        expect(DashLayout.layoutDash(entries, 2000, 11).iconSize).toBe(40);
-        expect(DashLayout.layoutDash(entries, 1000, 11).iconSize).toBe(32);
-        expect(DashLayout.layoutDash(entries, 500, 11).hiddenCount).toBeGreaterThan(0);
+        expect(DashLayout.layoutDash(entries, 2000).iconSize).toBe(40);
+        expect(DashLayout.layoutDash(entries, 1000).iconSize).toBe(32);
+        expect(DashLayout.layoutDash(entries, 500).hiddenCount).toBeGreaterThan(0);
     });
 
     it('an empty running subsection has no separator; launchpad is never a DashIcon', () => {
         const result = entries(snapshot({running: [], windows: []}));
-        const layout = DashLayout.layoutDash(result.favorites, 1000, 11);
-        expect(layout.tokens.filter(token => token.type === 'separator').length).toBe(0);
-        expect(layout.tokens[0].type).toBe('launchpad');
-        expect(layout.tokens.filter(token => token.type === 'icon').length).toBe(2);
+        const layout = DashLayout.layoutDash(result.favorites, 1000);
+        expect(layout.tokens.filter(token => token.type === Constants.DashTokenType.SEPARATOR).length).toBe(0);
+        expect(layout.tokens[0].type).toBe(Constants.DashTokenType.LAUNCHPAD);
+        expect(layout.tokens.filter(token => token.type === Constants.DashTokenType.DASH_ICON).length).toBe(2);
     });
 
     it('overflow counts exclude the launchpad and separator, expanded rows restore all icons', () => {
         for (const scale of [1, 1.5, 2, 3]) {
+            layoutManager.primaryMonitor.geometry_scale = scale;
             for (const count of [3, 20, 100]) {
                 const entries = Array.from({length: count}, (_, index) => ({
                     item: app(`${index}`), group: index < 2 ? 'favorites' : 'running',
                 }));
                 for (const width of [150, 250, 500, 1000]) {
-                    const layout = DashLayout.layoutDash(entries, width * scale, 11 * scale, scale);
-                    const shown = layout.tokens.filter(token => token.type === 'icon').length;
+                    const layout = DashLayout.layoutDash(entries, width * scale);
+                    const shown = layout.tokens.filter(token => token.type === Constants.DashTokenType.DASH_ICON).length;
                     expect(shown + layout.hiddenCount).toBe(count);
                     expect(layout.width).toBeLessThanOrEqual(width * scale);
-                    const rows = DashLayout.expandedRows(entries, layout.iconSize, (width - 22) * scale, scale);
-                    expect(rows.flat().filter(token => token.type === 'icon').length).toBe(count);
-                    expect(rows.flat().filter(token => token.type === 'launchpad').length).toBe(1);
-                    expect(rows.flat().filter(token => token.type === 'separator').length).toBe(1);
+                    const rows = DashLayout.expandedRows(entries, layout.iconSize, (width - 22) * scale);
+                    expect(rows.flat().filter(token => token.type === Constants.DashTokenType.DASH_ICON).length).toBe(count);
+                    expect(rows.flat().filter(token => token.type === Constants.DashTokenType.LAUNCHPAD).length).toBe(1);
+                    expect(rows.flat().filter(token => token.type === Constants.DashTokenType.SEPARATOR).length).toBe(1);
                     for (const row of rows) {
-                        expect(row.at(-1).type).not.toBe('separator');
-                        expect(DashLayout.tokensWidth(row, scale)).toBeLessThanOrEqual((width - 22) * scale);
+                        expect(row.at(-1).type).not.toBe(Constants.DashTokenType.SEPARATOR);
+                        expect(DashLayout.tokensWidth(row)).toBeLessThanOrEqual((width - 22) * scale);
                     }
                 }
             }
         }
     });
+
+    afterEach(() => { layoutManager.primaryMonitor.geometry_scale = 1; });
 
     it('multi-window activation cycles first, second, minimize all, first', () => {
         const entry = {item: {appId: firefox.get_id()}, windows: [window(firefox, 1), window(firefox, 2)]};

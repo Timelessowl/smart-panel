@@ -1,115 +1,114 @@
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import Pango from 'gi://Pango';
 import St from 'gi://St';
 import * as BoxPointer from '@girs/gnome-shell/ui/boxpointer';
 import * as Main from '@girs/gnome-shell/ui/main';
 import * as Constants from '@/extension/constants.js';
-import TimeoutManager from '@/utils/timeoutHelper.js';
-const Timeouts = Object.freeze({
-    SHOW: {label: 'showTimeout', timeout: Constants.DASH_LABEL_SHOW_DELAY},
-    RESET: {label: 'resetTimeout', timeout: Constants.DASH_LABEL_SHOW_DELAY},
-});
+import * as Session from '@/utils/session.js';
 
-export class DashLabel {
+// One persistent pointer per dash. Hiding keeps the actor owned and reachable
+// until section teardown, including while an opacity transition is running.
+export class DashLabel extends BoxPointer.BoxPointer {
+    static {
+        GObject.registerClass(this);
+    }
+
     constructor(anchor, themeManager) {
+        super(St.Side.BOTTOM, {reactive: false});
         this._anchor = anchor;
-        this._themeManager = themeManager;
-        this._actor = null;
-        this._timeoutManager = new TimeoutManager();
+        this._showId = 0;
+        this._resetId = 0;
+        this._source = null;
+        this._sourceDestroyId = 0;
         this._shownRecently = false;
-    }
-    schedule(icon, text) {
-        if (!text) return;
-        this._timeoutManager.clearTimeout(Timeouts.SHOW.label);
-        this._timeoutManager.clearTimeout(Timeouts.RESET.label);
-        if (this._shownRecently) {
-            this._show(icon, text);
-            return;
-        }
-        this._timeoutManager.addTimeout(
-            Timeouts.SHOW.label,
-            Timeouts.SHOW.timeout,
-            () => {
-                this._timeoutManager.clearTimeout(Timeouts.SHOW.label);
-                this._show(icon, text);
-                return GLib.SOURCE_REMOVE;
-            }
-        );
-    }
-    hide() {
-        this._timeoutManager.clearTimeout(Timeouts.SHOW.label);
-        const actor = this._actor;
-        if (!actor) return;
-        this._actor = null;
-        actor.ease({
-            opacity: 0,
-            duration: Constants.DASH_LABEL_HIDE_TIME,
-            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onComplete: () => this._remove(actor),
-        });
-        this._timeoutManager.addTimeout(
-            Timeouts.RESET.label,
-            Timeouts.RESET.timeout,
-            () => {
-                this._timeoutManager.clearTimeout(Timeouts.RESET.label);
-                this._shownRecently = false;
-                return GLib.SOURCE_REMOVE;
-            }
-        );
-    }
-
-    destroy() {
-        this._timeoutManager.destroy();
-        const actor = this._actor;
-        this._actor = null;
-        if (actor) this._remove(actor);
-        this._anchor = null;
-        this._themeManager = null;
-    }
-
-    _show(icon, text) {
-        const previous = this._actor;
-        if (previous) this._remove(previous);
-
-        const pointer = new BoxPointer.BoxPointer(St.Side.BOTTOM, {});
-        pointer.add_style_class_name('smart-panel-dash-label');
-        const label = new St.Label({
+        this.add_style_class_name('smart-panel-dash-label');
+        this._label = new St.Label({
             style_class: 'smart-panel-dash-label-text',
             reactive: false,
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.CENTER,
-            text,
         });
-        label.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
-        label.set_style(`max-width: ${Constants.DASH_LABEL_MAX_WIDTH}px;`);
-        pointer.bin.add_child(label);
-        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
-        const [, iconY] = icon.get_transformed_position();
-        const [, anchorY] = this._anchor.get_transformed_position();
-        const gap =
-            Math.round((iconY - anchorY) / scale) + Constants.DASH_LABEL_GAP;
-        this._themeManager.addActor(pointer);
-        pointer.set_style(`-boxpointer-gap: ${gap}px;`);
-        Main.layoutManager.addTopChrome(pointer, {
-            affectsInputRegion: false,
-            affectsStruts: false,
+        this._label.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
+        this._label.set_style(`max-width: ${Constants.DASH_LABEL_MAX_WIDTH}px;`);
+        this.bin.set_child(this._label);
+        this.visible = false;
+        this.connect('destroy', () => {
+            this._clearTimers();
+            this._setSource(null);
+            themeManager.removeActor(this);
+            Main.layoutManager.removeChrome(this);
         });
-        pointer.setPosition(icon, 0.5);
-        pointer.opacity = 0;
-        pointer.show();
-        pointer.ease({
-            opacity: 255,
-            duration: Constants.DASH_LABEL_SHOW_TIME,
+        themeManager.addActor(this);
+        Main.layoutManager.addTopChrome(this, {affectsInputRegion: false, affectsStruts: false});
+    }
+
+    schedule(icon, text) {
+        this._clearTimers();
+        this._setSource(icon);
+        if (!text) {
+            this.hide();
+            return;
+        }
+        this._label.text = text;
+        if (this._shownRecently) {
+            this._show();
+            return;
+        }
+        this._showId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, Constants.DASH_LABEL_SHOW_DELAY, () => {
+            this._showId = 0;
+            if (icon.mapped && icon.hover && !icon.dragging) this._show();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    hide() {
+        this._clearTimers();
+        this._setSource(null);
+        this.setPosition(null, 0.5);
+        if (!this._shownRecently) return;
+        this.remove_all_transitions();
+        this.ease({
+            opacity: 0,
+            duration: Constants.DASH_LABEL_HIDE_TIME,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            onComplete: () => {
+                this.visible = false;
+            },
         });
-        this._actor = pointer;
+        this._resetId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, Constants.DASH_LABEL_SHOW_DELAY, () => {
+            this._resetId = 0;
+            this._shownRecently = false;
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _show() {
+        const [, iconY] = this._source.get_transformed_position();
+        const [, anchorY] = this._anchor.get_transformed_position();
+        const gap = Math.round((iconY - anchorY) / Session.scale(1)) + Constants.DASH_LABEL_GAP;
+        this.set_style(`-boxpointer-gap: ${gap}px;`);
+        this.setPosition(this._source, 0.5);
+        this.remove_all_transitions();
+        this.opacity = 0;
+        this.visible = true;
+        this.ease({opacity: 255, duration: Constants.DASH_LABEL_SHOW_TIME, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
         this._shownRecently = true;
     }
 
-    _remove(actor) {
-        this._themeManager?.removeActor(actor);
-        Main.layoutManager.removeChrome(actor);
-        actor.destroy();
+    _setSource(source) {
+        // BoxPointer also connects to its source with this pointer as owner.
+        // Keep our pending-show listener separate from those native handlers.
+        if (this._sourceDestroyId) this._source.disconnect(this._sourceDestroyId);
+        this._source = source;
+        this._sourceDestroyId = source ? source.connect('destroy', () => this.hide()) : 0;
+    }
+
+    _clearTimers() {
+        if (this._showId) GLib.source_remove(this._showId);
+        if (this._resetId) GLib.source_remove(this._resetId);
+        this._showId = 0;
+        this._resetId = 0;
     }
 }

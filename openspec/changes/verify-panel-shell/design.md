@@ -5,7 +5,7 @@
 The master contract is [panel-shell](../../specs/panel-shell/spec.md).
 `src/extension/extension.js` creates a shared `DashSource` and a `MonitorManager`.
 The manager owns one `BottomPanel` per discovered monitor, plus a shared
-`ThemeManager` and `TransientInputManager`. Monitor changes currently destroy
+`ThemeManager`. Monitor changes currently destroy
 and recreate panels. Shared observer state is separate from per-panel views.
 
 ## Goals / Non-Goals
@@ -94,16 +94,16 @@ Do not multiply already-native icon texture dimensions a second time. Geometry
 rounding is centralized through the panel/section scale helpers, not a DI manager.
 Native mixed-scale X11 behavior still requires acceptance checks.
 
-### Theme and transient services have narrow ownership
+### Theme and popup ownership
 
 `ThemeManager` watches `org.gnome.desktop.interface::color-scheme`, selecting
 `.dark` only for `prefer-dark`, otherwise `.light`. It styles panels, expanded
 dash surfaces, and drag previews. Native popup-menu chrome follows Shell's own
 menu styling; this design does not recolor Shell's top-panel menus.
 Filled surfaces are opaque; frame borders, unfilled panel space, and the
-explicit drag ghost allow transparency. `TransientInputManager` handles expanded
-dash dismissal without a stage-wide input grab. Popup ownership stays with the
-feature that created it.
+explicit drag ghost allow transparency. Popup ownership stays with the feature
+that created it: native menu managers handle menus and Shell's GrabHelper
+handles expansion. There is no extension-owned global dismissal service.
 
 ### Build and ZIP installation
 

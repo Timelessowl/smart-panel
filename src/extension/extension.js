@@ -13,13 +13,13 @@ export default class SmartPanel extends Extension {
     enable() {
         this._settings = this.getSettings();
         //FIXME
-        Logger.init(true, Logger.LOG_LEVELS.ALL);
+        Logger.init();
         // Logger.init(
         //     this._settings.get_boolean('logging-enabled'),
         //     this._settings.get_int('log-level')
         // );
         // FIXME - remove once ACTUAL logic ready
-        IconStorage.init(this.dir);
+        IconStorage.init();
         this._settingsSyncer = new PanelSettingsSyncer(this._settings);
         //----------------------------------------
 
@@ -31,7 +31,6 @@ export default class SmartPanel extends Extension {
             dashSource: this._dashSource,
             notificationsMonitor: this._notificationsMonitor,
             indicators: [],
-            dateMenuDecorator: this._dateMenuDecorator,
         });
     }
 
@@ -50,6 +49,8 @@ export default class SmartPanel extends Extension {
         this._monitorManager = null;
         this._notificationsMonitor?.destroy();
         this._notificationsMonitor = null;
+        this._dashSource?.destroy();
+        this._dashSource = null;
         this._settings = null;
     }
 }

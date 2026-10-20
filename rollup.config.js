@@ -61,6 +61,7 @@ export default {
         alias({
             entries: [
                 {find: '@girs/gnome-shell/ui/dash', replacement: 'resource:///org/gnome/shell/ui/dash.js'},
+                {find: '@girs/gnome-shell/ui/grabHelper', replacement: 'resource:///org/gnome/shell/ui/grabHelper.js'},
                 {find: '@', replacement: path.resolve(__dirname, 'src')},
             ],
         }),

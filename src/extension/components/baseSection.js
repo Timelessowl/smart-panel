@@ -1,4 +1,3 @@
-import Logger from '@/utils/logger';
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
@@ -35,7 +34,7 @@ export class BaseSection extends St.Widget {
 
     setSectionContent(content) {
         if (this._content)
-            Logger.error('A panel section can only have one content actor');
+            throw new Error('A panel section can only have one content actor');
 
         this._content = content;
         this._content.add_style_class_name('panel-section-content');

@@ -25,16 +25,7 @@ export class BottomPanel extends St.Widget {
     /**
      * @param {Monitor} monitor
      **/
-    constructor(
-        monitor,
-        {
-            dashSource,
-            notificationsMonitor,
-            indicators,
-            themeManager,
-            transientInputManager,
-        }
-    ) {
+    constructor(monitor, {dashSource, notificationsMonitor, indicators, themeManager}) {
         super({
             style_class: 'bottom-panel-surface',
             layout_manager: new Clutter.FixedLayout(),
@@ -43,28 +34,13 @@ export class BottomPanel extends St.Widget {
         });
 
         this._monitor = monitor;
-        this._scaleFactor = Session.isWaylandSession()
-            ? 1
-            : monitor.geometry_scale;
 
         this._debianButton = new DebianButton();
-        this._dashSection = new DashSection(
-            dashSource,
-            monitor.index,
-            themeManager,
-            transientInputManager,
-            notificationsMonitor,
-            this._scaleFactor
-        );
+        this._dashSection = new DashSection(dashSource, monitor.index, themeManager, notificationsMonitor);
         this._searchSection = new SearchSection();
-        this._indicatorSection = new IndicatorSection(
-            indicators,
-            this._scaleFactor
-        );
-        this._systemSection = new SystemSection({panel: this});
-        this._systemSection.connect(Constants.SIGNAL_GEOMETRY_CHANGED, () =>
-            this._updateGeometry()
-        );
+        this._indicatorSection = new IndicatorSection(indicators);
+        this._systemSection = new SystemSection();
+        this._systemSection.connect(Constants.SIGNAL_GEOMETRY_CHANGED, () => this._updateGeometry());
 
         this._components = [
             this._debianButton,
@@ -76,11 +52,7 @@ export class BottomPanel extends St.Widget {
 
         for (const component of this._components) this.add_child(component);
 
-        this._dashSection.connectObject(
-            'layout-changed',
-            this._updateGeometry.bind(this),
-            this
-        );
+        this._dashSection.connectObject('layout-changed', this._updateGeometry.bind(this), this);
         this._updateGeometry();
 
         Main.layoutManager.addChrome(this, {
@@ -92,85 +64,42 @@ export class BottomPanel extends St.Widget {
 
     _updateGeometry() {
         const monitor = this._monitor;
-        const panelHeight = this._scale(Constants.PANEL_HEIGHT);
-        const sectionHeight = this._scale(Constants.SECTION_HEIGHT);
-        const horizontalPadding = this._scale(
-            Constants.PANEL_HORIZONTAL_PADDING
-        );
-        const topPadding = this._scale(Constants.PANEL_TOP_PADDING);
-        const bottomPadding = this._scale(Constants.PANEL_BOTTOM_PADDING);
+        const panelHeight = Session.scale(Constants.PANEL_HEIGHT);
+        const sectionHeight = Session.scale(Constants.SECTION_HEIGHT);
+        const horizontalPadding = Session.scale(Constants.PANEL_HORIZONTAL_PADDING);
+        const topPadding = Session.scale(Constants.PANEL_TOP_PADDING);
+        const bottomPadding = Session.scale(Constants.PANEL_BOTTOM_PADDING);
 
         const panelWidth = monitor.width;
         const searchWidth = Math.min(
-            this._scale(Constants.SEARCH_MAX_WIDTH),
-            Math.round(panelWidth * Constants.SEARCH_WIDTH_RATIO)
+            Session.scale(Constants.SEARCH_MAX_WIDTH),
+            Math.round(panelWidth * Constants.SEARCH_WIDTH_RATIO),
         );
         const searchX = Math.round((panelWidth - searchWidth) / 2);
-        const dashStart =
-            horizontalPadding +
-            sectionHeight +
-            this._scale(Constants.START_SECTION_GAP);
-        const dashMaxWidth = Math.max(
-            0,
-            searchX - this._scale(Constants.SEARCH_CLEARANCE) - dashStart
-        );
+        const dashStart = horizontalPadding + sectionHeight + Session.scale(Constants.START_SECTION_GAP);
+        const dashMaxWidth = Math.max(0, searchX - Session.scale(Constants.SEARCH_CLEARANCE) - dashStart);
 
-        const systemWidth = this._scale(this._systemSection.preferredWidth);
+        const systemWidth = Session.scale(this._systemSection.preferredWidth);
         this.set_size(panelWidth, panelHeight);
         this.set_position(monitor.x, monitor.y + monitor.height - panelHeight);
 
         this._dashSection.setAvailableSize(
             dashMaxWidth,
-            monitor.height -
-                bottomPadding -
-                this._scale(Constants.DASH_EXPANSION_TOP_MARGIN)
+            monitor.height - bottomPadding - Session.scale(Constants.DASH_EXPANSION_TOP_MARGIN),
         );
-        const dashWidth = Math.min(
-            dashMaxWidth,
-            this._dashSection.preferredWidth
-        );
+        const dashWidth = Math.min(dashMaxWidth, this._dashSection.preferredWidth);
 
-        this._place(
-            this._debianButton,
-            horizontalPadding,
-            topPadding,
-            sectionHeight,
-            sectionHeight
-        );
-        this._place(
-            this._dashSection,
-            dashStart,
-            topPadding,
-            dashWidth,
-            sectionHeight
-        );
-        this._place(
-            this._searchSection,
-            searchX,
-            topPadding,
-            searchWidth,
-            sectionHeight
-        );
+        this._place(this._debianButton, horizontalPadding, topPadding, sectionHeight, sectionHeight);
+        this._place(this._dashSection, dashStart, topPadding, dashWidth, sectionHeight);
+        this._place(this._searchSection, searchX, topPadding, searchWidth, sectionHeight);
         this._placeFromEnd(
             this._indicatorSection,
-            horizontalPadding +
-                this._scale(Constants.END_SECTION_GAP) +
-                systemWidth,
+            horizontalPadding + Session.scale(Constants.END_SECTION_GAP) + systemWidth,
             topPadding,
-            this._scale(this._indicatorSection.preferredWidth),
-            sectionHeight
+            Session.scale(this._indicatorSection.preferredWidth),
+            sectionHeight,
         );
-        this._placeFromEnd(
-            this._systemSection,
-            horizontalPadding,
-            topPadding,
-            systemWidth,
-            sectionHeight
-        );
-    }
-
-    _scale(value) {
-        return Math.round(value * this._scaleFactor);
+        this._placeFromEnd(this._systemSection, horizontalPadding, topPadding, systemWidth, sectionHeight);
     }
 
     _place(section, x, y, width, height) {

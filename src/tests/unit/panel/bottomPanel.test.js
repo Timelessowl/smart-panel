@@ -2,7 +2,7 @@ import * as GjsHarness from '@/tests/gjsHarness.js';
 import {SignalObject} from '@/tests/gjsHarness.js';
 import * as Constants from '@/extension/constants.js';
 
-async function fixture(wayland, geometryScale) {
+async function fixture(geometryScale, secondaryScale = geometryScale) {
     class Actor extends SignalObject {
         constructor(props = {}) {
             super();
@@ -23,9 +23,9 @@ async function fixture(wayland, geometryScale) {
     const imports = {
         'gi://Clutter': {default: {FixedLayout: class {}}},
         'gi://GObject': {default: {registerClass: cls => cls}},
-        'gi://Meta': {default: {is_wayland_compositor: () => wayland}},
         'gi://St': {default: {Widget: Actor}},
         'resource:///org/gnome/shell/ui/main.js': {layoutManager: {
+            primaryMonitor: {index: 0, geometry_scale: geometryScale},
             addChrome: (actor, options) => { actor.chromeOptions = options; },
         }},
     };
@@ -34,32 +34,33 @@ async function fixture(wayland, geometryScale) {
         ['debianButton', 'DebianButton', Actor],
         ['indicatorSection', 'IndicatorSection', Indicators],
         ['searchSection', 'SearchSection', Actor],
-        ['systemSection', 'SystemSection', Actor],
+        ['systemSection', 'SystemSection', class extends Actor {
+            constructor() { super(); this.preferredWidth = 236; }
+        }],
     ]) {
         imports[new URL(`extension/components/${file}.js`, GjsHarness.sourceDirectory).href] = {[name]: type};
     }
     const {BottomPanel} = await GjsHarness.loadGjsModule(
         new URL('extension/components/bottomPanel.js', GjsHarness.sourceDirectory), imports);
-    const monitor = {index: 0, x: 200, y: 100, width: 1920, height: 1080,
-        geometry_scale: geometryScale};
+    const monitor = {index: 1, x: 200, y: 100, width: 1920, height: 1080,
+        geometry_scale: secondaryScale};
     return {panel: new BottomPanel(monitor, {}), monitor};
 }
 
 describe('Content and border geometry', () => {
     it('keeps content height separate from the two border edges and panel padding', () => {
-        expect(Constants.SECTION_HEIGHT).toBe(64);
+        expect(Constants.SECTION_HEIGHT).toBe(74);
         expect(Constants.SECTION_FRAME_WIDTH).toBe(8);
         expect(Constants.SECTION_BORDER_WIDTH).toBe(1);
-        expect(Constants.PANEL_HEIGHT).toBe(122);
-        expect(Constants.PANEL_HEIGHT).toBe(Constants.SECTION_HEIGHT + (Constants.SECTION_FRAME_WIDTH + Constants.SECTION_BORDER_WIDTH) * 2 +
-            Constants.PANEL_TOP_PADDING + Constants.PANEL_BOTTOM_PADDING);
-        expect(Constants.INDICATOR_MIN_WIDTH).toBe(Constants.SECTION_HEIGHT + (Constants.SECTION_FRAME_WIDTH + Constants.SECTION_BORDER_WIDTH) * 2);
+        expect(Constants.PANEL_HEIGHT).toBe(90);
+        expect(Constants.PANEL_HEIGHT).toBe(Constants.SECTION_HEIGHT + Constants.PANEL_TOP_PADDING + Constants.PANEL_BOTTOM_PADDING);
+        expect(Constants.INDICATOR_MIN_WIDTH).toBe(Constants.SECTION_HEIGHT);
     });
 
-    it('allocates framed sections, square button/indicator, gaps and reservation consistently on X11', async () => {
+    it('allocates framed sections, square button/indicator, gaps and reservation consistently using the primary monitor scale', async () => {
         for (const scale of [1, 1.5, 2]) {
-            const {panel, monitor} = await fixture(false, scale);
-            const outerHeight = (Constants.SECTION_HEIGHT + (Constants.SECTION_FRAME_WIDTH + Constants.SECTION_BORDER_WIDTH) * 2) * scale;
+            const {panel, monitor} = await fixture(scale);
+            const outerHeight = Constants.SECTION_HEIGHT * scale;
             expect(panel.height).toBe(Constants.PANEL_HEIGHT * scale);
             expect(panel.y + panel.height).toBe(monitor.y + monitor.height);
             for (const section of panel._components) {
@@ -67,7 +68,7 @@ describe('Content and border geometry', () => {
                 expect(section.y).toBe(Constants.PANEL_TOP_PADDING * scale);
                 expect(panel.height - section.y - section.height).toBe(Constants.PANEL_BOTTOM_PADDING * scale);
                 expect(section.height - (Constants.SECTION_FRAME_WIDTH + Constants.SECTION_BORDER_WIDTH) * scale * 2)
-                    .toBe(Constants.SECTION_HEIGHT * scale);
+                    .toBe(Constants.CONTENT_HEIGHT * scale);
             }
             expect(panel._debianButton.width).toBe(outerHeight);
             expect(panel._indicatorSection.width).toBe(outerHeight);
@@ -78,16 +79,16 @@ describe('Content and border geometry', () => {
         }
     });
 
-    it('leaves Wayland stage dimensions unmultiplied', async () => {
-        const {panel} = await fixture(true, 2);
-        expect(panel.height).toBe(Constants.PANEL_HEIGHT);
-        expect(panel._debianButton.height).toBe(Constants.SECTION_HEIGHT + (Constants.SECTION_FRAME_WIDTH + Constants.SECTION_BORDER_WIDTH) * 2);
-        expect(panel._debianButton.width).toBe(Constants.SECTION_HEIGHT + (Constants.SECTION_FRAME_WIDTH + Constants.SECTION_BORDER_WIDTH) * 2);
-        expect(panel._scaleFactor).toBe(1);
+    it('scales every panel from the primary monitor even when the target scale differs', async () => {
+        const {panel} = await fixture(2, 1);
+        expect(panel.height).toBe(Constants.PANEL_HEIGHT * 2);
+        expect(panel._debianButton.height).toBe(Constants.SECTION_HEIGHT * 2);
+        expect(panel._debianButton.width).toBe(Constants.SECTION_HEIGHT * 2);
+        expect(Object.hasOwn(panel, '_scaleFactor')).toBe(false);
     });
 
     it('updates allocated dash width from the section signal without refreshing its source', async () => {
-        const {panel} = await fixture(true, 1);
+        const {panel} = await fixture(1);
         const searchX = panel._searchSection.x;
         panel._dashSection.preferredWidth = 300;
         panel._dashSection.emit('layout-changed');
