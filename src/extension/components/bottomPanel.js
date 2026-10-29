@@ -9,6 +9,7 @@ import {DebianButton} from '@/extension/components/debianButton.js';
 import {IndicatorSection} from '@/extension/components/indicatorSection.js';
 import {SearchSection} from '@/extension/components/searchSection.js';
 import {SystemSection} from '@/extension/components/systemSection.js';
+import {AppGrid} from '@/extension/components/appGrid.js';
 
 import * as Session from '@/utils/session.js';
 import * as Constants from '@/extension/constants.js';
@@ -34,12 +35,14 @@ export class BottomPanel extends St.Widget {
         });
 
         this._monitor = monitor;
+        this._themeManager = themeManager;
 
         this._debianButton = new DebianButton();
-        this._dashSection = new DashSection(dashSource, monitor.index, themeManager, notificationsMonitor);
         this._searchSection = new SearchSection();
         this._indicatorSection = new IndicatorSection(indicators);
         this._systemSection = new SystemSection();
+        this._appGrid = new AppGrid(this);
+        this._dashSection = new DashSection(dashSource, monitor.index, themeManager, notificationsMonitor, this._appGrid);
         this._systemSection.connect(Constants.SIGNAL_GEOMETRY_CHANGED, () => this._updateGeometry());
 
         this._components = [
@@ -118,6 +121,8 @@ export class BottomPanel extends St.Widget {
     }
 
     destroy() {
+        this._appGrid?.destroy();
+        this._appGrid = null;
         Main.layoutManager.removeChrome(this);
 
         for (const component of this._components) component.destroy?.();

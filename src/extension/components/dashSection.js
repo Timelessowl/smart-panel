@@ -16,14 +16,13 @@ import {DashDragDrop} from '@/extension/components/dash/dashDragDrop.js';
 import * as DashUtils from '@/extension/components/dash/dashUtils.js';
 import * as Main from '@girs/gnome-shell/ui/main';
 import {ExpandedDash} from '@/extension/components/dash/expandedDash.js';
-import OverviewHelper from '@/extension/components/dash/overviewHelper.js';
 
 export class DashSection extends BaseSection {
     static {
         GObject.registerClass({Signals: {'layout-changed': {}}}, this);
     }
 
-    constructor(source, monitorIndex, themeManager, notificationsMonitor) {
+    constructor(source, monitorIndex, themeManager, notificationsMonitor, appGrid) {
         super();
         this.canExpand = true;
         this.preferredWidth = 0;
@@ -32,7 +31,7 @@ export class DashSection extends BaseSection {
         this._monitorIndex = monitorIndex;
         this._themeManager = themeManager;
         this._notificationsMonitor = notificationsMonitor;
-        this._overviewHelper = new OverviewHelper();
+        this._appGrid = appGrid;
         this._availableWidth = 0;
         this._maxExpansionHeight = Session.scale(Constants.SECTION_HEIGHT);
         this._expandedSurface = null;
@@ -145,7 +144,7 @@ export class DashSection extends BaseSection {
             const side = Session.scale(iconSize);
             const button = new St.Button({
                 style_class: 'dash-app-button',
-                accessible_name: 'Toggle overview',
+                accessible_name: 'Show applications',
                 can_focus: true,
                 width: side,
                 height: side,
@@ -157,9 +156,9 @@ export class DashSection extends BaseSection {
             button.connect('clicked', () => {
                 this.resetCycle();
                 this.closeExpanded();
-                this._overviewHelper.overviewActive()
-                    ? this._overviewHelper.closeAppsOverview()
-                    : this._overviewHelper.openAppsOverview();
+                this._appGrid.appGridActive()
+                    ? this._appGrid.closeAppGrid()
+                    : this._appGrid.openAppGrid();
             });
             const item = new DashItem(width);
             item.setButton(button);

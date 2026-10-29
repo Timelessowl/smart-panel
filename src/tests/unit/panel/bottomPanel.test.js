@@ -14,8 +14,16 @@ async function fixture(geometryScale, secondaryScale = geometryScale) {
         set_position(x, y) { Object.assign(this, {x, y}); }
     }
     class Dash extends Actor {
-        constructor() { super(); this.preferredWidth = 200; }
+        constructor(source, monitorIndex, themeManager, notificationsMonitor, appGrid) {
+            super();
+            this.preferredWidth = 200;
+            this.appGrid = appGrid;
+        }
         setAvailableSize(width, height) { this.availableSize = [width, height]; }
+        closeExpanded() { this.expandedClosed = true; }
+    }
+    class AppGrid extends Actor {
+        constructor(panel) { super(); this.panel = panel; }
     }
     class Indicators extends Actor {
         constructor() { super(); this.preferredWidth = Constants.INDICATOR_MIN_WIDTH; }
@@ -30,6 +38,7 @@ async function fixture(geometryScale, secondaryScale = geometryScale) {
         }},
     };
     for (const [file, name, type] of [
+        ['appGrid', 'AppGrid', AppGrid],
         ['dashSection', 'DashSection', Dash],
         ['debianButton', 'DebianButton', Actor],
         ['indicatorSection', 'IndicatorSection', Indicators],
@@ -48,6 +57,17 @@ async function fixture(geometryScale, secondaryScale = geometryScale) {
 }
 
 describe('Content and border geometry', () => {
+    it('creates one grid with the panel and passes that instance to the dash', async () => {
+        const {panel, monitor} = await fixture(1);
+        const grid = panel._appGrid;
+        expect(grid.panel).toBe(panel);
+        expect(grid.panel._monitor).toBe(monitor);
+        expect(grid.panel._searchSection).toBe(panel._searchSection);
+        expect(panel._dashSection.appGrid).toBe(grid);
+        panel._updateGeometry();
+        expect(panel._appGrid).toBe(grid);
+    });
+
     it('keeps content height separate from the two border edges and panel padding', () => {
         expect(Constants.SECTION_HEIGHT).toBe(74);
         expect(Constants.SECTION_FRAME_WIDTH).toBe(8);

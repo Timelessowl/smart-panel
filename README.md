@@ -5,7 +5,7 @@ the bottom of every connected monitor:
 
 1. A square Debian menu button.
 2. A real app/window dash with favorites, running items, and overflow.
-3. A centered, currently passive search entry.
+3. A centered search entry that filters apps while Launchpad is open.
 4. An indicator area, hidden until indicators are supplied.
 5. Date and quick-settings placeholders.
 
@@ -122,7 +122,29 @@ dots update in place. Closing one of an app's preview windows keeps that menu
 open with the remaining windows. Closing the last window closes its empty
 preview; a pinned app's launcher remains available.
 
-Launchpad toggles overview and follows the dash’s 40/32 px icon size. Favorites follow GNOME's
+Launchpad opens a separate overlay on the clicked panel's monitor and follows
+the dash’s 40/32 px icon size. Its transparent, blurred background covers only
+that monitor. The existing panel search section stays in place and receives
+keyboard focus; the other sections disappear until the picker closes. The
+panel's window reservation stays intact. Apps appear alphabetically in an 8×4
+grid, with clickable page dots, scrolling, and Page Up/Page Down navigation.
+Search uses Shell's application index and usage ranking, respects hidden apps
+and parental controls, and includes no files, remote providers, or system actions.
+Enter activates the first app on the current page; Up moves focus into the grid.
+Escape or an outside click/touch dismisses it and clears the query. A native app
+menu closes before the picker when dismissed with Escape. App icons reuse Shell's
+`AppIcon` activation, Ctrl/middle-click behavior, running dots, and context menus;
+grid rearrangement and folders are not included. GNOME's global overview is never
+opened or restyled. The native blur and multi-monitor appearance still require
+a live Shell check; the launchpad tests cover geometry, pagination, search,
+native activation delegation, dismissal, restoration, and destruction.
+
+`BottomPanel` creates `AppGrid(this)` and supplies it to `DashSection`. The dash
+owns the Launchpad button and calls `appGridActive()`, `openAppGrid()`, and
+`closeAppGrid()` directly. AppGrid owns the overlay, search, section visibility
+and restoration, geometry observation, and cleanup through its panel reference.
+
+Favorites follow GNOME's
 list, with Files and Thunderbird fixed first. They cannot be removed or dragged.
 Running items start with a separator; the empty running subsection is hidden.
 App icons start at 40px, shrink to 32px when space runs out, then use a `+N`
@@ -275,7 +297,7 @@ These tests do not establish native GNOME runtime acceptance.
 
 The English [OpenSpec index](openspec/README.md) links the master panel contract
 and Debian menu, dash, indicator, and system-section specs, designs, and tasks.
-Search behavior is intentionally not specified yet. Remaining implementation
+Search is currently limited to Launchpad's application filter. Remaining implementation
 gaps and native acceptance checks are tracked explicitly rather than marked done.
 
 The [Just Perfection API assessment](docs/just-perfection-api-review.md) maps that

@@ -3,6 +3,20 @@ import * as Constants from '@/extension/constants.js';
 const fixture = NativeDash.fixture;
 
 describe('Native panel popup ownership', () => {
+    it('lets the dash launchpad button consume its supplied app grid actions directly', async () => {
+        const f = await fixture();
+        const section = f.section();
+        section._openExpanded();
+        const launchpad = section._dash.get_children().find(item =>
+            item._dashToken.type === Constants.DashTokenType.LAUNCHPAD).button;
+        launchpad.emit('clicked');
+        expect(f.appGrid.isOpen).toBeTrue();
+        expect(section._expandedSurface).toBeNull();
+        launchpad.emit('clicked');
+        expect(f.appGrid.isOpen).toBeFalse();
+        section.destroy();
+    });
+
     it('cleans popups and pending drops when a native parent destroys the section', async () => {
         const f = await fixture();
         const section = f.section();

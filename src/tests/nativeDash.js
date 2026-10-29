@@ -258,6 +258,12 @@ export async function fixture() {
     };
     const icon = () => new DashIcon(entry(), owner, 32);
     const theme = {addActor: actor => themed.add(actor), removeActor: actor => themed.delete(actor)};
+    const appGrid = {
+        isOpen: false,
+        appGridActive() { return this.isOpen; },
+        openAppGrid() { this.isOpen = true; },
+        closeAppGrid() { this.isOpen = false; },
+    };
     const section = ({entries = Array.from({length: 7}, entry), width = 190, source: sharedSource} = {}) => {
         const source = sharedSource ?? Object.assign(new SignalObject(), {entries,
             writable: true, savedOrders: [],
@@ -278,7 +284,7 @@ export async function fixture() {
                     .map(entry => ({...entry, item: {...entry.item}})),
             }; },
             getEntryWindows: entry => entry.windows});
-        const section = new DashSection(source, 0, theme, null);
+        const section = new DashSection(source, 0, theme, null, appGrid);
         section.set_size(width, 82);
         section.setAvailableSize(width, 500);
         return section;
@@ -289,7 +295,7 @@ export async function fixture() {
         dragDrop: {addDropZone() {}, setExpandedSurface(surface) { this.surface = surface; }},
         themeManager: theme});
     return {Actor, owner, icon, entry, expanded, section, theme, DebianButton, IndicatorSection,
-        chrome, themed, grabs, timeouts, activated, Clutter,
+        chrome, themed, grabs, timeouts, activated, Clutter, appGrid,
         anchor: new Actor({x: 20, y: 1000, width: 400, height: 82}),
         event(type, target, flags = 0) { return {target, type: () => type, get_flags: () => flags,
             get_button: () => Clutter.BUTTON_SECONDARY, get_key_symbol: () => Clutter.KEY_Escape, get_related: () => target}; },

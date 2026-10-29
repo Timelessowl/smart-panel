@@ -1,0 +1,49 @@
+.launchpad-background {
+    background-color: rgba(25, 25, 30, 0.22);
+}
+
+.launchpad-app.overview-tile {
+    border-radius: 16px;
+    padding: 8px;
+    color: white;
+
+    &:hover,
+    &:focus {
+        background-color: rgba(255, 255, 255, 0.16);
+    }
+
+    .overview-icon {
+        padding: 0;
+        spacing: 8px;
+    }
+}
+
+.launchpad-pages {
+    spacing: 4px;
+}
+
+.launchpad-page {
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 12px 8px;
+
+    .launchpad-page-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background-color: rgba(255, 255, 255, 0.35);
+    }
+
+    &:checked .launchpad-page-dot,
+    &:hover .launchpad-page-dot,
+    &:focus .launchpad-page-dot {
+        background-color: white;
+    }
+}
+
+.launchpad-empty {
+    color: white;
+    text-align: center;
+    font-size: 18px;
+}
