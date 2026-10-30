@@ -10,6 +10,7 @@ async function fixture(geometryScale, secondaryScale = geometryScale) {
             this.children = [];
         }
         add_child(child) { this.children.push(child); }
+        insert_child_at_index(child, index) { this.children.splice(index, 0, child); }
         set_size(width, height) { Object.assign(this, {width, height}); }
         set_position(x, y) { Object.assign(this, {x, y}); }
     }

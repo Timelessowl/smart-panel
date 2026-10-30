@@ -11,6 +11,7 @@ import * as ParentalControlsManager from '@girs/gnome-shell/misc/parentalControl
 import * as Constants from '@/extension/constants.js';
 import * as Session from '@/utils/session.js';
 import {RoundedBackgroundBlur} from '@/externals/roundedBackgroundBlur.js';
+import PropertyOverrideManager from '@/utils/propertyOverrideManager.js';
 
 // Keep Shell's activation (including Ctrl/middle-click), running indicator,
 // keyboard handling and AppMenu. Only the surrounding overview is ours.
@@ -69,14 +70,14 @@ export class AppGrid extends St.Widget {
         });
         this._panel = panel;
         this._searchSection = panel._searchSection;
-        this._sectionVisibility = new Map();
+        this._overrideManager = new PropertyOverrideManager();
         this._appSystem = Shell.AppSystem.get_default();
         this._parentalControls = ParentalControlsManager.getDefault();
         this._icons = new Map();
         this._results = [];
         this._page = 0;
         this.isOpen = false;
-        this._grabHelper = new GrabHelper.GrabHelper(this, {actionMode: Shell.ActionMode.POPUP});
+        this._grabHelper = new GrabHelper.GrabHelper(panel, {actionMode: Shell.ActionMode.POPUP});
 
         this._background = new RoundedBackgroundBlur({radius: 44, brightness: 0.8});
         this._background.set_child(new St.Widget({style_class: 'launchpad-background'}));
@@ -92,7 +93,14 @@ export class AppGrid extends St.Widget {
         });
         this._pageControls = new St.Bin({child: this._dots});
         this._content.add_child(this._pageControls);
-        this._empty = new St.Label({text: 'No apps found', style_class: 'launchpad-empty'});
+        this._empty = new St.Bin({
+            child: new St.Label({
+                text: 'No apps found',
+                style_class: 'launchpad-empty',
+                x_align: Clutter.ActorAlign.CENTER,
+                y_align: Clutter.ActorAlign.START,
+            }),
+        });
         this._content.add_child(this._empty);
 
         const text = this._searchSection.entry.clutter_text;
@@ -144,28 +152,40 @@ export class AppGrid extends St.Widget {
             this,
         );
         panel.connectObject('destroy', () => this.destroy(), this);
-        this._searchSection.connectObject(
-            'notify::y',
-            () => {
-                if (this.isOpen) this._positionSearch();
+        panel.connectObject(
+            'button-press-event',
+            (_actor, event) => (this.isOpen ? this._dismissBackground(event) : Clutter.EVENT_PROPAGATE),
+            this,
+        );
+        panel.connectObject(
+            'touch-event',
+            (_actor, event) =>
+                this.isOpen && event.type() === Clutter.EventType.TOUCH_BEGIN
+                    ? this._dismissBackground(event)
+                    : Clutter.EVENT_PROPAGATE,
+            this,
+        );
+        panel.connectObject(
+            'scroll-event',
+            (_actor, event) => (this.isOpen ? this._onScroll(event) : Clutter.EVENT_PROPAGATE),
+            this,
+        );
+        panel.connectObject(
+            'key-press-event',
+            (_actor, event) => {
+                if (!this.isOpen) return Clutter.EVENT_PROPAGATE;
+                const key = event.get_key_symbol();
+                if (key !== Clutter.KEY_Page_Up && key !== Clutter.KEY_Page_Down) return Clutter.EVENT_PROPAGATE;
+                this.goToPage(this._page + (key === Clutter.KEY_Page_Down ? 1 : -1));
+                return Clutter.EVENT_STOP;
             },
             this,
         );
-        this.connect('button-press-event', (_actor, event) => this._dismissBackground(event));
-        this.connect('touch-event', (_actor, event) =>
-            event.type() === Clutter.EventType.TOUCH_BEGIN ? this._dismissBackground(event) : Clutter.EVENT_PROPAGATE,
-        );
-        this.connect('scroll-event', (_actor, event) => this._onScroll(event));
-        this.connect('key-press-event', (_actor, event) => {
-            const key = event.get_key_symbol();
-            if (key !== Clutter.KEY_Page_Up && key !== Clutter.KEY_Page_Down) return Clutter.EVENT_PROPAGATE;
-            this.goToPage(this._page + (key === Clutter.KEY_Page_Down ? 1 : -1));
-            return Clutter.EVENT_STOP;
-        });
-        global.focus_manager.add_group(this);
+        global.focus_manager.add_group(panel);
         this.connect('destroy', () => {
             this.closeAppGrid();
-            global.focus_manager.remove_group(this);
+            this._overrideManager.destroy();
+            global.focus_manager.remove_group(panel);
         });
     }
 
@@ -178,23 +198,17 @@ export class AppGrid extends St.Widget {
         this.isOpen = true;
         this._lastScrollTime = 0;
         this._scrollDelta = 0;
-        this._searchIndex = this._panel.get_children().indexOf(this._searchSection);
-        this._searchPosition = [this._searchSection.x, this._searchSection.y];
-        this._panel.remove_child(this._searchSection);
-        this.add_child(this._searchSection);
         for (const section of this._panel._components) {
             if (section === this._searchSection) continue;
-            this._sectionVisibility.set(section, section.visible);
-            section.visible = false;
+            this._overrideManager.overrideProperty(section, 'visible', false);
         }
         this._panel._themeManager.addActor(this);
         this.updateGeometry();
         this._refresh(true);
         this.show();
-        Main.layoutManager.addTopChrome(this, {affectsInputRegion: true, affectsStruts: false, trackFullscreen: true});
         if (
             !this._grabHelper.grab({
-                actor: this,
+                actor: this._panel,
                 focus: this._searchSection.entry.clutter_text,
                 onUngrab: () => this.closeAppGrid(),
             })
@@ -206,24 +220,17 @@ export class AppGrid extends St.Widget {
         if (!this.isOpen) return;
         this.isOpen = false;
         for (const icon of this._icons.values()) icon.closeMenu();
-        this._grabHelper.ungrab({actor: this});
-        this.remove_child(this._searchSection);
-        this._panel.insert_child_at_index(this._searchSection, this._searchIndex);
-        this._searchSection.set_position(...this._searchPosition);
-        for (const [section, visible] of this._sectionVisibility) section.visible = visible;
-        this._sectionVisibility.clear();
-        this._searchSection.entry.set_text('');
+        this._grabHelper.ungrab({actor: this._panel});
+        this._overrideManager.clear();
         this._panel._themeManager.removeActor(this);
-        Main.layoutManager.removeChrome(this);
         this.hide();
     }
 
     updateGeometry() {
-        const {x, y, width, height} = this._panel._monitor;
-        this.set_position(x, y);
+        const {width, height} = this._panel._monitor;
+        this.set_position(0, this._panel.height - height);
         this.set_size(width, height);
         this._background.set_size(width, height);
-        this._positionSearch();
         const margin = Math.min(Session.scale(Constants.APP_GRID_MARGIN), width * 0.05);
         const availableHeight = Math.max(1, height - Session.scale(Constants.PANEL_HEIGHT) - margin * 2);
         const gridWidth = Math.min(Session.scale(Constants.APP_GRID_MAX_WIDTH), width - margin * 2);
@@ -246,16 +253,9 @@ export class AppGrid extends St.Widget {
         this._grid.set_size(contentWidth, gridHeight);
         this._pageControls.set_position(0, gridHeight);
         this._pageControls.set_size(contentWidth, Session.scale(Constants.APP_GRID_DOTS_HEIGHT));
-        this._empty.set_position(0, Math.round(gridHeight / 2));
+        this._empty.set_position(0, 0);
         this._empty.width = contentWidth;
         if (this._results.length) this._showPage();
-    }
-
-    _positionSearch() {
-        // The panel can lay out its sections while search is hosted here.
-        // Translate that placement into monitor coordinates without panel hooks.
-        const y = this._panel._monitor.height - Session.scale(Constants.PANEL_HEIGHT) + this._searchPosition[1];
-        if (this._searchSection.y !== y) this._searchSection.y = y;
     }
 
     _refresh(resetPage = false) {

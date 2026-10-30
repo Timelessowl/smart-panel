@@ -1,5 +1,6 @@
 import * as GjsHarness from '@/tests/gjsHarness.js';
 import {SignalObject} from '@/tests/gjsHarness.js';
+import * as Constants from '@/extension/constants.js';
 
 async function fixture({count = 65, scale = 1, monitor = {x: -1920, y: 100, width: 1920, height: 1080}} = {}) {
     let focus = null;
@@ -34,6 +35,10 @@ async function fixture({count = 65, scale = 1, monitor = {x: -1920, y: 100, widt
         }
         set_child(actor) {
             this.add_child(actor);
+        }
+        get_transformed_position() {
+            const [x, y] = this.parent?.get_transformed_position() ?? [0, 0];
+            return [this.x + x, this.y + y];
         }
         contains(actor) {
             return this === actor || this.children.some((child) => child.contains(actor));
@@ -111,12 +116,13 @@ async function fixture({count = 65, scale = 1, monitor = {x: -1920, y: 100, widt
     let failGrab = false;
     class GrabHelper {
         constructor(owner) {
-            owner.connect('captured-event', (_actor, event) => {
-                if (event.get_key_symbol?.() === 'Escape' || !owner.contains(event.target)) this.ungrab();
-            });
+            this.owner = owner;
         }
         grab(params) {
             if (failGrab) return false;
+            this.captureId = this.owner.connect('captured-event', (_actor, event) => {
+                if (event.get_key_symbol?.() === 'Escape' || !this.owner.contains(event.target)) this.ungrab();
+            });
             this.params = params;
             grabs.push(this);
             this.savedFocus = focus;
@@ -129,6 +135,7 @@ async function fixture({count = 65, scale = 1, monitor = {x: -1920, y: 100, widt
             this.params = null;
             // Shell invokes the callback before releasing the modal grab.
             params.onUngrab();
+            this.owner.disconnect(this.captureId);
             grabs.splice(grabs.indexOf(this), 1);
             focus = this.savedFocus;
         }
@@ -151,8 +158,9 @@ async function fixture({count = 65, scale = 1, monitor = {x: -1920, y: 100, widt
     const imports = {
         'gi://Clutter': {
             default: {
+                Actor,
                 FixedLayout: class {},
-                ActorAlign: {CENTER: 1},
+                ActorAlign: {CENTER: 1, START: 2},
                 EventType: {TOUCH_BEGIN: 'touch'},
                 KEY_Up: 'Up',
                 KEY_Page_Up: 'PageUp',
@@ -199,9 +207,17 @@ async function fixture({count = 65, scale = 1, monitor = {x: -1920, y: 100, widt
             },
         },
     );
-    const panel = new Actor(),
+    class DebianSection extends Actor {}
+    class SearchSection extends Actor {}
+    class IndicatorSection extends Actor {}
+    const panel = new Actor({
+            x: monitor.x,
+            y: monitor.y + monitor.height - Constants.PANEL_HEIGHT * scale,
+            width: monitor.width,
+            height: Constants.PANEL_HEIGHT * scale,
+        }),
         text = new Actor(),
-        searchSection = new Actor({x: 700, y: 8});
+        searchSection = new SearchSection({x: 700, y: 8});
     searchSection.entry = new Actor();
     searchSection.entry.clutter_text = text;
     searchSection.entry.text = '';
@@ -212,9 +228,9 @@ async function fixture({count = 65, scale = 1, monitor = {x: -1920, y: 100, widt
     };
     searchSection.add_child(searchSection.entry);
     searchSection.entry.add_child(text);
-    panel.add_child(new Actor());
+    panel.add_child(new DebianSection());
     panel.add_child(searchSection);
-    panel.add_child(new Actor({visible: false}));
+    panel.add_child(new IndicatorSection({visible: false}));
     panel._monitor = monitor;
     panel._searchSection = searchSection;
     panel._components = panel.get_children();
@@ -223,6 +239,7 @@ async function fixture({count = 65, scale = 1, monitor = {x: -1920, y: 100, widt
         removeActor: (actor) => themed.delete(actor),
     };
     const picker = new AppGrid(panel);
+    panel.insert_child_at_index(picker, 0);
     return {
         picker,
         panel,
@@ -252,27 +269,30 @@ describe('Monitor-local launchpad', () => {
         const first = await fixture(),
             other = await fixture({monitor: {x: 0, y: 0, width: 2560, height: 1440}});
         first.picker.openAppGrid();
-        expect([first.picker.x, first.picker.y, first.picker.width, first.picker.height]).toEqual([
-            -1920, 100, 1920, 1080,
-        ]);
+        expect(first.picker.get_transformed_position()).toEqual([-1920, 100]);
+        expect([first.picker.width, first.picker.height]).toEqual([1920, 1080]);
         expect(first.picker._background.width).toBe(1920);
         expect(first.panel.opacity).toBe(255);
-        expect(first.panel.children.every((section) => !section.visible)).toBeTrue();
+        expect(
+            first.panel._components
+                .filter((section) => section !== first.searchSection)
+                .every((section) => !section.visible),
+        ).toBeTrue();
         expect(first.panel.visible).toBeTrue();
-        expect(first.searchSection.get_parent()).toBe(first.picker);
-        expect(first.searchSection.y).toBe(998);
+        expect(first.searchSection.get_parent()).toBe(first.panel);
+        expect([first.searchSection.x, first.searchSection.y]).toEqual([700, 8]);
         expect(first.getFocus()).toBe(first.text);
         expect(first.overview.hide).not.toHaveBeenCalled();
         expect(other.picker.isOpen).toBeFalse();
         expect(other.panel.opacity).toBe(255);
-        expect(other.panel.children[0].visible).toBeTrue();
+        expect(other.panel._components[0].visible).toBeTrue();
         first.picker.closeAppGrid();
         expect(first.searchSection.get_parent()).toBe(first.panel);
-        expect(first.panel.children.indexOf(first.searchSection)).toBe(1);
+        expect(first.panel.children.indexOf(first.searchSection)).toBe(2);
         expect(first.searchSection.y).toBe(8);
         expect(first.panel.opacity).toBe(255);
-        expect(first.panel.children[0].visible).toBeTrue();
-        expect(first.panel.children[2].visible).toBeFalse();
+        expect(first.panel._components[0].visible).toBeTrue();
+        expect(first.panel._components[2].visible).toBeFalse();
     });
 
     it('uses 32 slots in eight columns and four rows, with clickable page dots and bounded pages', async () => {
@@ -296,18 +316,20 @@ describe('Monitor-local launchpad', () => {
         expect(f.picker._page).toBe(0);
     });
 
-    it('follows panel allocation and keeps search at the bottom when panel sections are laid out again', async () => {
+    it('never moves, reparents or clears the existing search while opening, relaying layout changes, or closing', async () => {
         const f = await fixture();
+        f.searchSection.entry.set_text('editor');
         f.picker.openAppGrid();
-        f.searchSection.set_position(700, 8);
-        f.searchSection.emit('notify::y');
-        expect(f.searchSection.y).toBe(998);
+        expect(f.searchSection.parent).toBe(f.panel);
+        expect([f.searchSection.x, f.searchSection.y]).toEqual([700, 8]);
         f.panel._monitor.height = 1200;
         f.panel.emit('notify::allocation');
         expect(f.picker.height).toBe(1200);
-        expect(f.searchSection.y).toBe(1118);
+        expect([f.searchSection.x, f.searchSection.y]).toEqual([700, 8]);
         f.picker.closeAppGrid();
-        expect(f.searchSection.y).toBe(8);
+        expect(f.searchSection.parent).toBe(f.panel);
+        expect([f.searchSection.x, f.searchSection.y]).toEqual([700, 8]);
+        expect(f.searchSection.entry.get_text()).toBe('editor');
     });
 
     it('uses native application search with no remote providers, filters hidden apps, and resets pagination', async () => {
@@ -354,12 +376,12 @@ describe('Monitor-local launchpad', () => {
     it('supports keyboard paging and rate-limits wheel and touchpad paging without treating search scrolling as paging', async () => {
         const f = await fixture({count: 100});
         f.picker.openAppGrid();
-        f.picker.emit('key-press-event', {get_key_symbol: () => 'PageDown'});
+        f.panel.emit('key-press-event', {get_key_symbol: () => 'PageDown'});
         expect(f.picker._page).toBe(1);
-        f.picker.emit('key-press-event', {get_key_symbol: () => 'PageUp'});
+        f.panel.emit('key-press-event', {get_key_symbol: () => 'PageUp'});
         expect(f.picker._page).toBe(0);
         const scroll = (direction, time, target = f.picker, delta = [0, 0]) =>
-            f.picker.emit('scroll-event', {
+            f.panel.emit('scroll-event', {
                 target,
                 get_scroll_direction: () => direction,
                 get_time: () => time,
@@ -385,22 +407,22 @@ describe('Monitor-local launchpad', () => {
         const f = await fixture();
         for (const target of [f.picker._content, f.text]) {
             f.picker.openAppGrid();
-            f.picker.emit('button-press-event', {target});
+            f.panel.emit('button-press-event', {target});
             expect(f.picker.isOpen).toBeTrue();
             f.picker.closeAppGrid();
         }
         for (const dismiss of [
-            () => f.picker.emit('captured-event', {get_key_symbol: () => 'Escape'}),
-            () => f.picker.emit('button-press-event', {target: f.picker}),
-            () => f.picker.emit('touch-event', {type: () => 'touch', target: f.picker}),
-            () => f.picker.emit('captured-event', {target: new f.Actor()}),
+            () => f.panel.emit('captured-event', {get_key_symbol: () => 'Escape'}),
+            () => f.panel.emit('button-press-event', {target: f.picker}),
+            () => f.panel.emit('touch-event', {type: () => 'touch', target: f.picker}),
+            () => f.panel.emit('captured-event', {target: new f.Actor()}),
         ]) {
             f.picker.openAppGrid();
             dismiss();
             expect(f.picker.isOpen).toBeFalse();
             expect(f.grabs.length + f.chrome.size + f.themed.size).toBe(0);
             expect(f.panel.opacity).toBe(255);
-            expect(f.panel.children[0].visible).toBeTrue();
+            expect(f.panel._components[0].visible).toBeTrue();
         }
     });
 
@@ -445,7 +467,7 @@ describe('Monitor-local launchpad', () => {
         expect(f.visibleIcons().length).toBe(32);
         expect(f.picker._content.x).toBeGreaterThanOrEqual(0);
         expect(f.picker._content.y).toBeGreaterThanOrEqual(0);
-        expect(f.picker._content.y + f.picker._content.height).toBeLessThan(f.searchSection.y);
+        expect(f.picker.y + f.picker._content.y + f.picker._content.height).toBeLessThan(f.searchSection.y);
         f.apps.splice(1);
         f.appSystem.emit('installed-changed');
         expect(f.visibleIcons().length).toBe(1);

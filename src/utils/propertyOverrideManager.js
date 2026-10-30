@@ -11,21 +11,18 @@ export default class PropertyOverrideManager {
      * @param {any} newValue
      **/
     overrideProperty(object, propName, newValue) {
-        if (!(object instanceof Clutter.Actor) || !object[propName]) return; //TODO Logger?
-        const destroyId = object.connect('destroy', () =>
-            this._overrides.delete(propName)
-        );
-        this._overrides.set(propName, {
-            object,
-            value: object[propName],
-            destroyId,
-        });
+        if (!(object instanceof Clutter.Actor) || !(propName in object)) return;
+        const key = `${object.constructor.name}-${propName}`;
+        if (!this._overrides.has(key)) {
+            const destroyId = object.connect('destroy', () => this._overrides.delete(key));
+            this._overrides.set(key, {object, propName, value: object[propName], destroyId});
+        }
         object[propName] = newValue;
     }
 
     clear() {
-        this._overrides?.forEach((override, propName) => {
-            override.object[propName] = override.value;
+        this._overrides.forEach((override) => {
+            override.object[override.propName] = override.value;
             override.object?.disconnect(override.destroyId);
         });
         this._overrides.clear();

@@ -128,10 +128,14 @@ that monitor. The existing panel search section stays in place and receives
 keyboard focus; the other sections disappear until the picker closes. The
 panel's window reservation stays intact. Apps appear alphabetically in an 8×4
 grid, with clickable page dots, scrolling, and Page Up/Page Down navigation.
+Pressing Super opens Launchpad on the monitor under the pointer; pressing it
+again there closes the grid. GNOME's original Super handler is restored when
+the extension is disabled. The empty search message sits at the top center of
+the results area.
 Search uses Shell's application index and usage ranking, respects hidden apps
 and parental controls, and includes no files, remote providers, or system actions.
 Enter activates the first app on the current page; Up moves focus into the grid.
-Escape or an outside click/touch dismisses it and clears the query. A native app
+Escape or an outside click/touch dismisses it. A native app
 menu closes before the picker when dismissed with Escape. App icons reuse Shell's
 `AppIcon` activation, Ctrl/middle-click behavior, running dots, and context menus;
 grid rearrangement and folders are not included. GNOME's global overview is never
@@ -141,8 +145,12 @@ native activation delegation, dismissal, restoration, and destruction.
 
 `BottomPanel` creates `AppGrid(this)` and supplies it to `DashSection`. The dash
 owns the Launchpad button and calls `appGridActive()`, `openAppGrid()`, and
-`closeAppGrid()` directly. AppGrid owns the overlay, search, section visibility
-and restoration, geometry observation, and cleanup through its panel reference.
+`closeAppGrid()` directly. The grid is a child of its monitor's panel; search
+remains a separate panel section with its existing position and parent. AppGrid
+only reads the query, connects search events and focuses the entry. It hides the
+other sections through `PropertyOverrideManager` and restores their visibility
+on close. `MonitorManager` owns the Super handler, blocks and restores GNOME's
+handler, and closes the other monitors' grids before opening the target grid.
 
 Favorites follow GNOME's
 list, with Files and Thunderbird fixed first. They cannot be removed or dragged.

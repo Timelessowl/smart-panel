@@ -54,6 +54,7 @@ export class BottomPanel extends St.Widget {
         ];
 
         for (const component of this._components) this.add_child(component);
+        this.insert_child_at_index(this._appGrid, 0);
 
         this._dashSection.connectObject('layout-changed', this._updateGeometry.bind(this), this);
         this._updateGeometry();
