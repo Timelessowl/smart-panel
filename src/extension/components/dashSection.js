@@ -32,6 +32,7 @@ export class DashSection extends BaseSection {
         this._themeManager = themeManager;
         this._notificationsMonitor = notificationsMonitor;
         this._appGrid = appGrid;
+        this._panel = appGrid?._panel;
         this._availableWidth = 0;
         this._maxExpansionHeight = Session.scale(Constants.SECTION_HEIGHT);
         this._expandedSurface = null;

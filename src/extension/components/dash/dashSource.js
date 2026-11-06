@@ -60,6 +60,9 @@ export class DashSource extends GObject.Object {
         const windows = this.getAppWindows(entry.item.app, this.monitorOnly ? monitor : null);
         return entry.representedWindow ? windows.filter((window) => window === entry.representedWindow) : windows;
     }
+    sortPreviewWindows(windows) {
+        return [...windows].sort((a, b) => b.get_user_time() - a.get_user_time());
+    }
     getEntries({monitor = null, runningOrder = []} = {}) {
         const windows = this.monitorOnly ? this.getOpenMonitorWindows(monitor) : this.getOpenedWindows();
         const windowsByApp = new Map();

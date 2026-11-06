@@ -33,6 +33,23 @@
     padding: 0;
 }
 
+.window-preview-menu {
+    background-color: transparent;
+    -arrow-background-color: transparent;
+    -arrow-border-width: 0;
+    box-shadow: none;
+}
+
+// Keep native menu-item state fills from covering the section's blurred frame.
+.window-preview-menu .window-preview-item,
+.window-preview-menu .window-preview-item:hover,
+.window-preview-menu .window-preview-item:focus,
+.window-preview-menu .window-preview-item:active,
+.window-preview-menu .window-preview-item:checked {
+    background-color: transparent;
+    box-shadow: none;
+}
+
 .dash-notification-badge {
     font-weight: $fw-600;
     color: white;
@@ -55,6 +72,10 @@
 }
 
 @each $theme, $palette in c.$palettes {
+    .window-preview-menu.#{$theme} {
+        color: map.get($palette, text);
+    }
+
     .bottom-panel-surface.#{$theme} {
         .dash-running-separator {
             background-color: map.get($palette, dot);

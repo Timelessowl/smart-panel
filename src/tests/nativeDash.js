@@ -13,7 +13,7 @@ export async function fixture() {
         add_child(actor) { actor.parent = this; this.children.push(actor); }
         insert_child_at_index(actor, index) { actor.parent = this; this.children.splice(index, 0, actor); }
         remove_child(actor) { this.children = this.children.filter(child => child !== actor); actor.parent = null; }
-        set_child(actor) { this.destroy_all_children(); this.child = actor; if (actor) this.add_child(actor); }
+        set_child(actor) { this.get_children().forEach(child => this.remove_child(child)); this.child = actor; if (actor) this.add_child(actor); }
         get_children() { return [...this.children]; }
         get_child_at_index(index) { return this.children[index]; }
         get_parent() { return this.parent; }
@@ -31,6 +31,7 @@ export async function fixture() {
         }
         get_transformed_size() { return this.get_size(); }
         set_style(style) { this.style = style; }
+        set_offscreen_redirect(mode) { this.offscreen_redirect = mode; }
         add_style_class_name() {}
         set_policy() {}
         set_vertical(vertical) { this.vertical = vertical; }
@@ -61,6 +62,7 @@ export async function fixture() {
     const Clutter = {
         Actor, Clone: Actor, BinLayout: class {}, FixedLayout: class {},
         ActorAlign: {FILL: 0, CENTER: 1, START: 2, END: 3},
+        OffscreenRedirect: {ALWAYS: 2},
         EventType: {KEY_PRESS: 1, BUTTON_PRESS: 2, TOUCH_BEGIN: 3, ENTER: 4, MOTION: 5, LEAVE: 6},
         EventFlags: {FLAG_GRAB_NOTIFY: 1}, KEY_Escape: 9, KEY_Up: 10,
         BUTTON_SECONDARY: 3, EVENT_STOP: true, EVENT_PROPAGATE: false, AnimationMode: {EASE_OUT_QUAD: 0},
@@ -144,6 +146,11 @@ export async function fixture() {
     class PopupMenu extends MenuSection {
         constructor(source) {
             super(); this.sourceActor = source; this.actor = new Actor(); this.isOpen = false;
+            this.actor.set_offscreen_redirect(Clutter.OffscreenRedirect.ALWAYS);
+            this._boxPointer = this.actor;
+            this._boxPointer.bin = new Actor();
+            this.actor.add_child(this._boxPointer.bin);
+            this._boxPointer.bin.set_child(this.box);
         }
         open() { if (this.isOpen) return; this.isOpen = true; this.emit('open-state-changed', true); }
         close() { if (!this.isOpen) return; this.isOpen = false; this.emit('open-state-changed', false); }
@@ -235,7 +242,9 @@ export async function fixture() {
         new URL('extension/components/indicatorSection.js', GjsHarness.sourceDirectory), imports, globals);
     const owner = {
         _monitorIndex: 0, _previewMenuManager: new PopupMenuManager(),
-        _source: {getEntryWindows: entry => entry.windows},
+        _themeManager: {addActor: actor => themed.add(actor), removeActor: actor => themed.delete(actor)},
+        _source: {getEntryWindows: entry => entry.windows,
+            sortPreviewWindows: windows => [...windows].sort((a, b) => b.get_user_time() - a.get_user_time())},
         resetCycle() {}, closeExpanded() {},
         canSetFavorite: () => false, canCloseAllWindows: () => false,
     };
@@ -283,7 +292,8 @@ export async function fixture() {
                     .sort((a, b) => runningOrder.indexOf(a.item.id) - runningOrder.indexOf(b.item.id))
                     .map(entry => ({...entry, item: {...entry.item}})),
             }; },
-            getEntryWindows: entry => entry.windows});
+            getEntryWindows: entry => entry.windows,
+            sortPreviewWindows: windows => [...windows].sort((a, b) => b.get_user_time() - a.get_user_time())});
         const section = new DashSection(source, 0, theme, null, appGrid);
         section.set_size(width, 82);
         section.setAvailableSize(width, 500);
